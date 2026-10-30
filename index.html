@@ -5,83 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f6f1">
   <title>GitHub Pages Test</title>
-  <style>
-    :root {
-      color-scheme: light;
-      font-family: "Trebuchet MS", sans-serif;
-      background: #f4f6f1;
-      color: #202b25;
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      min-height: 100vh;
-      margin: 0;
-      display: grid;
-      place-items: center;
-      padding: 24px;
-      background-image: radial-gradient(#d9e2d7 1px, transparent 1px);
-      background-size: 22px 22px;
-    }
-
-    main {
-      width: min(100%, 520px);
-      padding: 40px;
-      border: 1px solid #d8dfd7;
-      border-radius: 8px;
-      background: #fffefa;
-      box-shadow: 0 16px 40px #26392b12;
-    }
-
-    .status {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      color: #35684b;
-      font-size: 13px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-
-    .status::before {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #58a773;
-      content: "";
-    }
-
-    h1 {
-      margin: 18px 0 10px;
-      font-size: clamp(32px, 8vw, 46px);
-      line-height: 1.05;
-    }
-
-    p { color: #5b665e; line-height: 1.6; }
-
-    button {
-      margin-top: 16px;
-      padding: 11px 16px;
-      border: 0;
-      border-radius: 5px;
-      background: #245c3b;
-      color: white;
-      font: inherit;
-      font-weight: 700;
-      cursor: pointer;
-    }
-
-    button:hover { background: #19482d; }
-    button:focus-visible { outline: 3px solid #9dc9a8; outline-offset: 3px; }
-
-    #count { margin-left: 8px; color: #35684b; font-variant-numeric: tabular-nums; }
-
-    @media (max-width: 480px) {
-      main { padding: 28px 24px; }
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css">
+  <script src="script.js" defer></script>
 </head>
 <body>
   <main>
@@ -91,15 +16,5 @@
     <button id="test-button" type="button">Click to test</button>
     <span id="count" aria-live="polite">0 clicks</span>
   </main>
-  <script>
-    const button = document.querySelector("#test-button");
-    const count = document.querySelector("#count");
-    let clicks = 0;
-
-    button.addEventListener("click", () => {
-      clicks += 1;
-      count.textContent = `${clicks} ${clicks === 1 ? "click" : "clicks"}`;
-    });
-  </script>
 </body>
 </html>

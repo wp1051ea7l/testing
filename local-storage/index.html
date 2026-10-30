@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6f1">
+  <title>Local Storage · Testing</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <main>
+    <a class="back" href="../">← All tests</a>
+    <br>
+    <span class="status">Storage</span>
+    <h1>Local storage</h1>
+    <p>Type a note, then reload the page. It should still be here, saved in this browser only.</p>
+    <label for="note" class="sr-only">Note</label>
+    <textarea id="note" placeholder="Write something…"></textarea>
+    <div class="row">
+      <button id="clear" type="button" class="secondary">Clear note</button>
+      <span id="saved" aria-live="polite"></span>
+    </div>
+  </main>
+</body>
+</html>

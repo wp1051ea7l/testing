@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6f1">
+  <title>Canvas Animation · Testing</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <main>
+    <a class="back" href="../">← All tests</a>
+    <br>
+    <span class="status">Graphics</span>
+    <h1>Canvas animation</h1>
+    <p>Bouncing balls drawn with <code>requestAnimationFrame</code>. Click the canvas to add more.</p>
+    <canvas id="stage" aria-label="Bouncing balls animation"></canvas>
+    <div class="row">
+      <button id="toggle" type="button">Pause</button>
+      <button id="reset" type="button" class="secondary">Reset</button>
+      <span id="fps" aria-live="off"></span>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "items": [
+    { "name": "Basil", "detail": "Herb" },
+    { "name": "Fern", "detail": "Shade plant" },
+    { "name": "Moss", "detail": "Ground cover" },
+    { "name": "Sage", "detail": "Herb" },
+    { "name": "Ivy", "detail": "Climber" }
+  ]
+}

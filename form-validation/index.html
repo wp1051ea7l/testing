@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6f1">
+  <title>Form Validation · Testing</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <main>
+    <a class="back" href="../">← All tests</a>
+    <br>
+    <span class="status">Forms</span>
+    <h1>Form validation</h1>
+    <p>Fields are checked in JavaScript as you type and again on submit. Nothing is sent anywhere.</p>
+    <form id="signup" novalidate>
+      <label>Name
+        <input id="name" name="name" autocomplete="name">
+        <span class="error" id="name-error"></span>
+      </label>
+      <label>Email
+        <input id="email" name="email" type="email" autocomplete="email">
+        <span class="error" id="email-error"></span>
+      </label>
+      <label>Password (8+ characters, one number)
+        <input id="password" name="password" type="password" autocomplete="new-password">
+        <span class="error" id="password-error"></span>
+      </label>
+      <button type="submit">Submit</button>
+      <p id="result" aria-live="polite"></p>
+    </form>
+  </main>
+</body>
+</html>

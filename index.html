@@ -4,17 +4,62 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f6f1">
-  <title>GitHub Pages Test</title>
+  <title>Testing Pages</title>
   <link rel="stylesheet" href="styles.css">
   <script src="script.js" defer></script>
 </head>
 <body>
   <main>
-    <span class="status">Page is live</span>
-    <h1>GitHub Pages test</h1>
-    <p>A tiny page to make sure your site is publishing correctly.</p>
-    <button id="test-button" type="button">Click to test</button>
-    <span id="count" aria-live="polite">0 clicks</span>
+    <header>
+      <span class="status">Site is live</span>
+      <h1>Testing pages</h1>
+      <p>A collection of small pages for checking that the site publishes and that common browser features work.</p>
+      <label class="filter">
+        <span class="sr-only">Filter tests</span>
+        <input id="filter" type="search" placeholder="Filter tests…" autocomplete="off">
+      </label>
+    </header>
+
+    <nav aria-label="Test pages">
+      <ol id="toc">
+        <li><a href="click-counter/">
+          <span class="num">01</span>
+          <span class="body"><strong>Click counter</strong><span>Basic JavaScript and button events.</span></span>
+          <span class="tag">Basics</span>
+        </a></li>
+        <li><a href="form-validation/">
+          <span class="num">02</span>
+          <span class="body"><strong>Form validation</strong><span>Live field checks and a submit handled in script.</span></span>
+          <span class="tag">Forms</span>
+        </a></li>
+        <li><a href="local-storage/">
+          <span class="num">03</span>
+          <span class="body"><strong>Local storage</strong><span>A note that survives a page reload.</span></span>
+          <span class="tag">Storage</span>
+        </a></li>
+        <li><a href="fetch-json/">
+          <span class="num">04</span>
+          <span class="body"><strong>Fetch JSON</strong><span>Loads a data file from the site with fetch().</span></span>
+          <span class="tag">Network</span>
+        </a></li>
+        <li><a href="canvas/">
+          <span class="num">05</span>
+          <span class="body"><strong>Canvas animation</strong><span>Bouncing balls with requestAnimationFrame.</span></span>
+          <span class="tag">Graphics</span>
+        </a></li>
+        <li><a href="keyboard/">
+          <span class="num">06</span>
+          <span class="body"><strong>Keyboard events</strong><span>Shows key, code and modifiers for each press.</span></span>
+          <span class="tag">Input</span>
+        </a></li>
+        <li><a href="browser-info/">
+          <span class="num">07</span>
+          <span class="body"><strong>Browser info</strong><span>Viewport, preferences, language and more.</span></span>
+          <span class="tag">Environment</span>
+        </a></li>
+      </ol>
+      <p id="empty" hidden>No tests match that filter.</p>
+    </nav>
   </main>
 </body>
 </html>

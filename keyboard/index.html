@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6f1">
+  <title>Keyboard Events · Testing</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <main>
+    <a class="back" href="../">← All tests</a>
+    <br>
+    <span class="status">Input</span>
+    <h1>Keyboard events</h1>
+    <p>Press any key to see what the browser reports for it.</p>
+    <div class="key" id="key" aria-live="polite">—</div>
+    <dl>
+      <dt>key</dt><dd id="k-key">—</dd>
+      <dt>code</dt><dd id="k-code">—</dd>
+      <dt>modifiers</dt><dd id="k-mods">—</dd>
+      <dt>repeat</dt><dd id="k-repeat">—</dd>
+      <dt>keys pressed</dt><dd id="k-count">0</dd>
+    </dl>
+  </main>
+</body>
+</html>

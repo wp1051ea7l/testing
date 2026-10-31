@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="48" viewBox="0 0 32 48">
-  <!-- Bottom 32×32 is the tile. The game squishes it from the bottom centre. -->
-  <path id="body" d="M0.6 42 Q0.6 14.56 16 14.56 Q31.4 14.56 31.4 42 Z" fill="#d1405a"/>
-  <circle id="shine" cx="8.3" cy="22.4" r="3.5" fill="#ffffff" fill-opacity="0.44"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" viewBox="0 0 200 300">
+  <!-- Bottom 200×200 is the tile. The game squishes it from the bottom centre. -->
+  <path id="body" d="M3.75 262.5 Q3.75 91 100 91 Q196.25 91 196.25 262.5 Z" fill="#d1405a"/>
+  <circle id="shine" cx="51.875" cy="140" r="21.875" fill="#ffffff" fill-opacity="0.44"/>
   <g id="eyes" fill="#222">
-    <rect x="9" y="28.28" width="3" height="4"/>
-    <rect x="20.2" y="28.28" width="3" height="4"/>
+    <rect x="56.25" y="176.75" width="18.75" height="25"/>
+    <rect x="126.25" y="176.75" width="18.75" height="25"/>
   </g>
-  <path id="crown" d="M8 16.56 L8 6.56 L12 11.56 L16 4.56 L20 11.56 L24 6.56 L24 16.56 Z" fill="#ffd75e"/>
+  <path id="crown" d="M50 103.5 L50 41 L75 72.25 L100 28.5 L125 72.25 L150 41 L150 103.5 Z" fill="#ffd75e"/>
 </svg>

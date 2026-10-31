@@ -1,9 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="48" viewBox="0 0 32 48">
-  <!-- Bottom 32×32 is the tile. The game squishes it from the bottom centre. -->
-  <path id="body" d="M5 42 Q5 22.4 16 22.4 Q27 22.4 27 42 Z" fill="#4fc46b"/>
-  <circle id="shine" cx="10.5" cy="28" r="2.5" fill="#ffffff" fill-opacity="0.44"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" viewBox="0 0 200 300">
+  <!-- Bottom 200×200 is the tile. The game squishes it from the bottom centre. -->
+  <path id="body" d="M31.25 262.5 Q31.25 140 100 140 Q168.75 140 168.75 262.5 Z" fill="#4fc46b"/>
+  <circle id="shine" cx="65.625" cy="175" r="15.625" fill="#ffffff" fill-opacity="0.44"/>
   <g id="eyes" fill="#222">
-    <rect x="11" y="32.2" width="3" height="4"/>
-    <rect x="19" y="32.2" width="3" height="4"/>
+    <rect x="68.75" y="201.25" width="18.75" height="25"/>
+    <rect x="118.75" y="201.25" width="18.75" height="25"/>
   </g>
 </svg>

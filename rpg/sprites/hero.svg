@@ -1,14 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="48" viewBox="0 0 32 48">
-  <!-- Faces right; the game mirrors it to face left. Bottom 32×32 is the tile. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" viewBox="0 0 200 300">
+  <!-- Faces right; the game mirrors it to face left. Bottom 200×200 is the tile. -->
   <g id="sword">
-    <rect x="24" y="24" width="3" height="14" fill="#d9dde3"/>
-    <rect x="22" y="36" width="7" height="3" fill="#8a5a2e"/>
+    <rect x="150" y="150" width="18.75" height="87.5" fill="#d9dde3"/>
+    <rect x="137.5" y="225" width="43.75" height="18.75" fill="#8a5a2e"/>
   </g>
-  <rect id="body" x="9" y="30" width="14" height="14" rx="4" fill="#3a6fd1"/>
-  <circle id="head" cx="16" cy="25" r="7" fill="#f1c79b"/>
-  <path id="hair" d="M9 23 A7 7 0 0 1 23 23 Z" fill="#6b3e1f"/>
+  <rect id="body" x="56.25" y="187.5" width="87.5" height="87.5" rx="25" fill="#3a6fd1"/>
+  <circle id="head" cx="100" cy="156.25" r="43.75" fill="#f1c79b"/>
+  <path id="hair" d="M56.25 143.75 A43.75 43.75 0 0 1 143.75 143.75 Z" fill="#6b3e1f"/>
   <g id="eyes" fill="#222">
-    <rect x="14" y="25" width="2" height="2"/>
-    <rect x="18" y="25" width="2" height="2"/>
+    <rect x="87.5" y="156.25" width="12.5" height="12.5"/>
+    <rect x="112.5" y="156.25" width="12.5" height="12.5"/>
   </g>
 </svg>

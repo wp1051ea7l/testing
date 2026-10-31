@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <!-- One tile, drawn on top of grass. -->
-  <rect id="walls" x="5" y="15" width="22" height="15" fill="#c9a46a"/>
-  <path id="roof" d="M2 16 L16 3 L30 16 Z" fill="#b5523b"/>
-  <rect id="door" x="13" y="21" width="7" height="9" fill="#6b4426"/>
-  <rect id="window" x="7" y="19" width="4" height="4" fill="#ffe08a"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <!-- One tile (200×200), drawn on top of grass. -->
+  <rect id="walls" x="31.25" y="93.75" width="137.5" height="93.75" fill="#c9a46a"/>
+  <path id="roof" d="M12.5 100 L100 18.75 L187.5 100 Z" fill="#b5523b"/>
+  <rect id="door" x="81.25" y="131.25" width="43.75" height="56.25" fill="#6b4426"/>
+  <rect id="window" x="43.75" y="118.75" width="25" height="25" fill="#ffe08a"/>
 </svg>

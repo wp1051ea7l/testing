@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <!-- One tile, drawn on top of grass. -->
-  <rect id="trunk" x="13" y="18" width="6" height="12" fill="#6b4426"/>
-  <circle id="leaves" cx="16" cy="14" r="12" fill="#2f6b34"/>
-  <circle id="highlight" cx="12" cy="10" r="6" fill="#3f8645"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <!-- One tile (200×200), drawn on top of grass. -->
+  <rect id="trunk" x="81.25" y="112.5" width="37.5" height="75" fill="#6b4426"/>
+  <circle id="leaves" cx="100" cy="87.5" r="75" fill="#2f6b34"/>
+  <circle id="highlight" cx="75" cy="62.5" r="37.5" fill="#3f8645"/>
 </svg>

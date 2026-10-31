@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="48" viewBox="0 0 32 48" fill="none">
-  <!-- Bottom 32×32 is the tile. The original drawing is kept as-is inside the group, scaled to 28 units tall. -->
-  <g id="astronaut" transform="translate(8.386 17) scale(0.122807) translate(-38 -38)">
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" viewBox="0 0 200 300" fill="none">
+  <!-- Bottom 200×200 is the tile. The original drawing is kept as-is inside the group, scaled to 175 units tall. -->
+  <g id="astronaut" transform="translate(52.412 106.25) scale(0.767544) translate(-38 -38)">
     <ellipse cx="96.5" cy="84.5" rx="27.5" ry="22.5" fill="#388143"/>
     <path d="M58 136H142C148.075 136 153 140.925 153 147V187C153 193.075 148.075 198 142 198H58C51.9249 198 47 193.075 47 187V147C47 140.925 51.9249 136 58 136Z" fill="#B8CBCB" stroke-width="4" stroke="#233344"/>
     <path d="M78 195H85C91.0751 195 96 199.925 96 206V250C96 256.075 91.0751 261 85 261H78C71.9249 261 67 256.075 67 250V206C67 199.925 71.9249 195 78 195Z" fill="#E4EBE8" stroke-width="4" stroke="#233344"/>

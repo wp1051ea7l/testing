@@ -12,14 +12,14 @@ const SCREEN_H = VIEW_H * TILE;
 
 // # tree, ~ water, = bridge, : path, s sand, , flowers, r rock, H hut,
 // W wall, D locked door, C key chest, $ gold chest, h potion,
-// P player, S sage, A astronaut, g slime, b blue slime, B slime king, . grass
+// P player, S sage, A astronaut, T blocky, g slime, b blue slime, B slime king, . grass
 const MAP = [
   "################################################",
   "#...,..,..,.........~~~..........#####.###....$#",
   "#,.H,.H,#,#.........~~~...g....................#",
   "#.....,#.,#H.....r..~~~.......:::::::::::......#",
   "##,#....###,.......#~~~.......:.........:...h..#",
-  "####..S.............~~~.......:.#...###.:......#",
+  "####..S....T........~~~.......:.#...###.:......#",
   "##,#.:::::::::::::::===::::::::.##...#..:......#",
   "#.,..P..:,..........~~~.......:.#.......:...##.#",
   "#.......:.###.A.....~~~#.##...:.........:...##.#",
@@ -67,6 +67,11 @@ const ASTRONAUT_LINES = [
   "The helmet stays on. I've seen what those slimes do.",
   "If you beat the slime king, maybe I can finally fix my radio in peace.",
 ];
+const BLOCKY_LINES = [
+  "Hello! I'm made entirely of rectangles.",
+  "Somebody drew me in a hurry. I think I turned out great.",
+  "Round things make me nervous. Have you seen those slimes?",
+];
 const NPCS = {
   S: {
     name: "Sage",
@@ -76,29 +81,58 @@ const NPCS = {
       : "The slime king hides in the south-east castle. Its key is in a chest in the north-east, across the river."),
   },
   A: { name: "Astronaut", draw: drawAstronaut, talk: (n) => ASTRONAUT_LINES[n % ASTRONAUT_LINES.length] },
+  T: { name: "Blocky", draw: drawBlocky, talk: (n) => BLOCKY_LINES[n % BLOCKY_LINES.length] },
 };
 
-// Art loaded from SVG files in sprites/ (see sprites/README.md). Tiles are
-// 32×32, one tile; characters are 32×48, with their tile as the bottom 32×32.
+// Art loaded from SVG files in sprites/ (see sprites/README.md). Every file
+// uses one scale: 200 canvas units = one tile, so the canvas size is the
+// object's size. A sprite stands on the ground: the bottom edge of its canvas
+// sits on the given ground line, centred on the given x.
 // Each is pre-rendered at the current scale, plus a white copy for the hit
 // flash, so drawing stays crisp and cheap.
-const SPRITE_NAMES = ["hero", "sage", "astronaut", "slime", "slime-blue", "slime-king", "tree", "hut"];
+const UNITS_PER_TILE = 200;
+const SPRITE_NAMES = ["hero", "sage", "astronaut", "TestChar", "slime", "slime-blue", "slime-king", "tree", "hut"];
 const sprites = {};
-for (const name of SPRITE_NAMES) {
+SPRITE_NAMES.forEach(loadSprite);
+
+async function loadSprite(name) {
   const img = new Image();
-  sprites[name] = { img, art: null, flash: null };
-  img.onload = () => prerenderSprite(name);
-  img.src = `sprites/${name}.svg`;
+  const s = (sprites[name] = { img, w: 0, h: 0, art: null, flash: null });
+  const url = `sprites/${name}.svg`;
+  let src = url;
+  // Exports often say width="100%", which leaves the browser guessing the
+  // size. Read the canvas size from the viewBox and render at exactly that.
+  // (Reading the file needs a web server; opened as a local file we fall back
+  // to the file's own width and height.)
+  try {
+    const res = await fetch(url);
+    const svg = new DOMParser().parseFromString(await res.text(), "image/svg+xml").documentElement;
+    if (!res.ok || svg.nodeName !== "svg") throw new Error(`Bad sprite ${url}`);
+    const box = svg.getAttribute("viewBox")?.trim().split(/[\s,]+/).map(Number);
+    if (box?.length === 4) {
+      svg.setAttribute("width", box[2]);
+      svg.setAttribute("height", box[3]);
+    }
+    src = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], { type: "image/svg+xml" }));
+  } catch {
+    // Keep the plain file URL.
+  }
+  img.onload = () => {
+    s.w = img.naturalWidth * TILE / UNITS_PER_TILE;
+    s.h = img.naturalHeight * TILE / UNITS_PER_TILE;
+    prerenderSprite(name);
+  };
+  img.src = src;
 }
 
 function prerenderSprite(name) {
   const s = sprites[name];
-  if (!s.img.naturalWidth) return;
+  if (!s.w) return;
   const scale = unit / TILE;
   const make = () => {
     const c = document.createElement("canvas");
-    c.width = Math.round(s.img.naturalWidth * scale);
-    c.height = Math.round(s.img.naturalHeight * scale);
+    c.width = Math.round(s.w * scale);
+    c.height = Math.round(s.h * scale);
     c.getContext("2d").drawImage(s.img, 0, 0, c.width, c.height);
     return c;
   };
@@ -110,19 +144,16 @@ function prerenderSprite(name) {
   g.fillRect(0, 0, s.flash.width, s.flash.height);
 }
 
-// Draws a sprite with its top-left at (x, y) in world units. Characters
-// (taller than a tile) start 16 units above their tile.
-function drawSprite(name, x, y, { flip = false, flash = false } = {}) {
+// Draws a sprite standing on the ground line `ground`, centred on `cx`
+// (world units). flip mirrors it left-right.
+function drawSprite(name, cx, ground, { flip = false, flash = false } = {}) {
   const s = sprites[name];
   if (!s.art) return;
-  const w = s.img.naturalWidth;
-  const h = s.img.naturalHeight;
   const art = flash ? s.flash : s.art;
-  if (!flip) return ctx.drawImage(art, x, y, w, h);
   ctx.save();
-  ctx.translate(x + w, y);
-  ctx.scale(-1, 1);
-  ctx.drawImage(art, 0, 0, w, h);
+  ctx.translate(cx, ground);
+  if (flip) ctx.scale(-1, 1);
+  ctx.drawImage(art, -s.w / 2, -s.h, s.w, s.h);
   ctx.restore();
 }
 
@@ -393,7 +424,7 @@ function drawTile(ch, x, y) {
 
   drawGrass(px, py, x, y);
   if (ch === "#") {
-    drawSprite("tree", px, py);
+    drawSprite("tree", px + 16, py + TILE);
   } else if (ch === ",") {
     const petals = ["#f5e663", "#f28bb3", "#ffffff"];
     for (let i = 0; i < 3; i++) {
@@ -416,7 +447,7 @@ function drawTile(ch, x, y) {
     ctx.ellipse(px + 13, py + 17, 6, 4, -0.3, 0, Math.PI * 2);
     ctx.fill();
   } else if (ch === "H") {
-    drawSprite("hut", px, py);
+    drawSprite("hut", px + 16, py + TILE);
   } else if (ch === "D") {
     drawWall(px, py);
     ctx.fillStyle = "#8a5a2e";
@@ -455,19 +486,24 @@ function drawHero(p) {
   const bob = Math.sin(time * 6) * 1;
   drawShadow(cx, p.dy * TILE + 16, 9);
   const flash = p.flash > 0 && Math.floor(time * 20) % 2;
-  drawSprite("hero", p.dx * TILE, p.dy * TILE - 16 + bob, { flip: p.facing < 0, flash });
+  drawSprite("hero", cx, p.dy * TILE + TILE + bob, { flip: p.facing < 0, flash });
 }
 
 function drawSage(n) {
   drawShadow(n.dx * TILE + 16, n.dy * TILE + 16, 9);
-  drawSprite("sage", n.dx * TILE, n.dy * TILE - 16);
+  drawSprite("sage", n.dx * TILE + 16, n.dy * TILE + TILE);
+}
+
+function drawBlocky(n) {
+  drawShadow(n.dx * TILE + 16, n.dy * TILE + 16, 12);
+  drawSprite("TestChar", n.dx * TILE + 16, n.dy * TILE + TILE);
 }
 
 function drawAstronaut(n) {
   drawShadow(n.dx * TILE + 16, n.dy * TILE + 16, 8);
   // Bobs gently upward, like it's not used to this gravity yet.
   const float = (1 - Math.cos(time * 2)) * 1.5;
-  drawSprite("astronaut", n.dx * TILE, n.dy * TILE - 16 - float);
+  drawSprite("astronaut", n.dx * TILE + 16, n.dy * TILE + TILE - float);
 }
 
 function drawSlime(e) {
@@ -482,7 +518,7 @@ function drawSlime(e) {
   ctx.scale((11 * size + squish) / (11 * size), (14 * size - squish) / (14 * size));
   ctx.translate(-cx, -base);
   const flash = e.flash > 0 && Math.floor(time * 20) % 2;
-  drawSprite(e.sprite, e.dx * TILE, e.dy * TILE - 16, { flash });
+  drawSprite(e.sprite, cx, e.dy * TILE + TILE, { flash });
   ctx.restore();
 }
 

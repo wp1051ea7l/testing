@@ -1,0 +1,118 @@
+/* The game is an exact 16:9 rectangle scaled by a whole number, so every
+   art pixel is the same number of device pixels. script.js sets #stage's
+   size and --u (one 16px tile, in CSS px); UI below is sized in art pixels
+   (var(--u) / 16) so it stays on the same pixel grid as the game. */
+:root {
+  color-scheme: dark;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  --u: 48px;
+  --px: calc(var(--u) / 16);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+body {
+  display: grid;
+  place-items: center;
+}
+
+#stage {
+  position: relative;
+  --px: calc(var(--u) / 16);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  image-rendering: pixelated;
+}
+
+.buttons {
+  position: absolute;
+  top: calc(var(--px) * 4);
+  right: calc(var(--px) * 4);
+  display: flex;
+  gap: calc(var(--px) * 2);
+}
+
+.buttons button,
+.buttons a,
+.pad button {
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background-color: #0f1a14c0;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: calc(var(--px) * 7);
+  box-shadow: inset 0 0 0 var(--px) #000;
+  image-rendering: pixelated;
+  cursor: pointer;
+}
+
+.buttons button,
+.buttons a {
+  width: calc(var(--px) * 11);
+  height: calc(var(--px) * 11);
+}
+
+.buttons button:hover,
+.buttons a:hover,
+.pad button:active { background-color: #245c3b; }
+
+button:focus-visible,
+a:focus-visible { outline: var(--px) solid #ffd75e; outline-offset: var(--px); }
+
+.pad {
+  position: absolute;
+  left: calc(var(--px) * 4);
+  bottom: calc(var(--px) * 4);
+  display: none;
+  grid-template-columns: repeat(3, calc(var(--px) * 17));
+  grid-template-rows: repeat(2, calc(var(--px) * 17));
+  grid-template-areas: ". up ." "left down right";
+  gap: calc(var(--px) * 2);
+}
+
+.pad button { touch-action: none; }
+.pad [data-dir="up"] { grid-area: up; }
+.pad [data-dir="left"] { grid-area: left; }
+.pad [data-dir="down"] { grid-area: down; }
+.pad [data-dir="right"] { grid-area: right; }
+
+@media (pointer: coarse) { .pad { display: grid; } }
+
+.rotate {
+  position: fixed;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  background: #000;
+  color: #fff;
+  font-size: 18px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.rotate span { font-size: 56px; }
+
+@media (orientation: portrait) and (pointer: coarse) {
+  .rotate { display: flex; }
+}

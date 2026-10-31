@@ -12,7 +12,7 @@ const SCREEN_H = VIEW_H * TILE;
 
 // # tree, ~ water, = bridge, : path, s sand, , flowers, r rock, H hut,
 // W wall, D locked door, C key chest, $ gold chest, h potion,
-// P player, S sage, g slime, b blue slime, B slime king, . grass
+// P player, S sage, A astronaut, g slime, b blue slime, B slime king, . grass
 const MAP = [
   "################################################",
   "#...,..,..,.........~~~..........#####.###....$#",
@@ -24,7 +24,7 @@ const MAP = [
   "#.,..P..:,..........~~~.......:.#.......:...##.#",
   "#.......:.###.......~~~#.##...:.........:...##.#",
   "#..Hr,..:.##H#,,g..#~~~##.....:......#....C.##.#",
-  "#,,.....:.,###......~~~#......:..b..##.........#",
+  "#,,.....:.,###..A...~~~#......:..b..##.........#",
   "#.##...,:..,##,.....~~~#......:.....##.........#",
   "#.###...:...........~~~#..h...:.............b..#",
   "#..##...:...........~~~.......:................#",
@@ -59,12 +59,49 @@ const ENEMIES = {
   b: { name: "blue slime", hp: 6, atk: 2, xp: 4, gold: 6, color: "#4a8be0" },
   B: { name: "slime king", hp: 16, atk: 3, xp: 10, gold: 50, color: "#d1405a", boss: true },
 };
+// People you talk to by walking into them. talk(n) gets how many times
+// you've already talked to them, so lines can change.
+const ASTRONAUT_LINES = [
+  "My ship came down in your river. Is this... a planet of slimes?",
+  "From orbit I saw a chest glinting in the north-east, past the river.",
+  "The helmet stays on. I've seen what those slimes do.",
+  "If you beat the slime king, maybe I can finally fix my radio in peace.",
+];
+const NPCS = {
+  S: {
+    name: "Sage",
+    draw: drawSage,
+    talk: () => (player.key
+      ? "The slime king's castle lies to the south-east. Good luck!"
+      : "The slime king hides in the south-east castle. Its key is in a chest in the north-east, across the river."),
+  },
+  A: { name: "Astronaut", draw: drawAstronaut, talk: (n) => ASTRONAUT_LINES[n % ASTRONAUT_LINES.length] },
+};
+
+// The astronaut is an SVG. It's drawn once into a canvas at the current
+// scale (and again on resize) so it stays crisp at any screen size.
+const ASTRONAUT_H = 28; // world units tall
+const astronautSvg = new Image();
+let astronautSprite = null;
+astronautSvg.onload = prerenderAstronaut;
+astronautSvg.src = "astronaut.svg";
+
+function prerenderAstronaut() {
+  if (!astronautSvg.naturalWidth) return;
+  const h = Math.round(ASTRONAUT_H * unit / TILE);
+  const sprite = document.createElement("canvas");
+  sprite.height = h;
+  sprite.width = Math.round(h * astronautSvg.naturalWidth / astronautSvg.naturalHeight);
+  sprite.getContext("2d").drawImage(astronautSvg, 0, 0, sprite.width, sprite.height);
+  astronautSprite = sprite;
+}
+
 const MINIMAP_COLORS = {
   "#": "#2f6b34", "~": "#3d7fc4", "=": "#a8743f", ":": "#d6bd85", s: "#e3d08f",
   W: "#7d7f86", D: "#8a5a2e", H: "#b5523b", r: "#8c8c8c", C: "#ffd75e", $: "#ffd75e",
 };
 
-let tiles, seen, player, enemies, npc, effects, gameState, message, time = 0;
+let tiles, seen, player, enemies, npcs, effects, gameState, message, time = 0;
 let unit = TILE;
 let lastMove = 0;
 
@@ -72,14 +109,15 @@ function reset() {
   tiles = MAP.map((row) => row.split(""));
   seen = tiles.map((row) => row.map(() => false));
   enemies = [];
+  npcs = [];
   effects = [];
   gameState = "play";
   tiles.forEach((row, y) => row.forEach((ch, x) => {
     const actor = { x, y, dx: x, dy: y, flash: 0 };
     if (ch === "P") player = { ...actor, hp: 10, maxHp: 10, atk: 1, xp: 0, level: 1, gold: 0, key: false, facing: 1 };
-    if (ch === "S") npc = actor;
+    if (NPCS[ch]) npcs.push({ ...actor, ...NPCS[ch], talks: 0 });
     if (ENEMIES[ch]) enemies.push({ ...actor, ...ENEMIES[ch] });
-    if ("PS".includes(ch) || ENEMIES[ch]) row[x] = ".";
+    if (ch === "P" || NPCS[ch] || ENEMIES[ch]) row[x] = ".";
   }));
   say("Find the sage in the village. Arrow keys or WASD to move.");
 }
@@ -94,6 +132,7 @@ function resize() {
   stage.style.width = `${canvas.width / dpr}px`;
   stage.style.height = `${canvas.height / dpr}px`;
   stage.style.setProperty("--u", `${unit / dpr}px`);
+  prerenderAstronaut();
 }
 
 function say(text) {
@@ -101,7 +140,7 @@ function say(text) {
 }
 
 function actorAt(x, y) {
-  return enemies.find((e) => e.x === x && e.y === y) || (npc.x === x && npc.y === y ? npc : null);
+  return enemies.find((e) => e.x === x && e.y === y) || npcs.find((n) => n.x === x && n.y === y) || null;
 }
 
 function popup(x, y, text, color) {
@@ -116,10 +155,8 @@ function move(mx, my) {
   const target = actorAt(nx, ny);
   const tile = tiles[ny][nx];
 
-  if (target === npc) {
-    say(player.key
-      ? "Sage: The slime king's castle lies to the south-east. Good luck!"
-      : "Sage: The slime king hides in the south-east castle. Its key is in a chest in the north-east, across the river.");
+  if (target?.talk) {
+    say(`${target.name}: ${target.talk(target.talks++)}`);
   } else if (target) {
     attack(target);
   } else if (tile === "C" || tile === "$") {
@@ -466,6 +503,16 @@ function drawSage(n) {
   ctx.fill();
 }
 
+function drawAstronaut(n) {
+  const cx = n.dx * TILE + 16;
+  drawShadow(cx, n.dy * TILE + 16, 8);
+  if (!astronautSprite) return;
+  // Bobs gently upward, like it's not used to this gravity yet.
+  const float = (1 - Math.cos(time * 2)) * 1.5;
+  const w = ASTRONAUT_H * astronautSprite.width / astronautSprite.height;
+  ctx.drawImage(astronautSprite, cx - w / 2, n.dy * TILE + 29 - ASTRONAUT_H - float, w, ASTRONAUT_H);
+}
+
 function drawSlime(e) {
   const size = e.boss ? 1.4 : 1;
   const squish = Math.sin(time * 5 + e.x) * 1.5;
@@ -600,7 +647,7 @@ function frame(now) {
   time = now / 1000;
 
   // Ease drawn positions toward grid positions for smooth steps.
-  for (const a of [player, npc, ...enemies]) {
+  for (const a of [player, ...npcs, ...enemies]) {
     a.dx += (a.x - a.dx) * Math.min(dt * 18, 1);
     a.dy += (a.y - a.dy) * Math.min(dt * 18, 1);
     a.flash = Math.max(0, a.flash - dt * 2.5);
@@ -624,7 +671,7 @@ function frame(now) {
     }
   }
   const visible = (a) => a.dx > x0 - 2 && a.dx < x1 + 2 && a.dy > y0 - 2 && a.dy < y1 + 2;
-  if (visible(npc)) drawSage(npc);
+  npcs.filter(visible).forEach((n) => n.draw(n));
   enemies.filter(visible).forEach(drawSlime);
   drawHero(player);
 

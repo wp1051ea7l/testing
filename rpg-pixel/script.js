@@ -871,6 +871,7 @@ function frame(now) {
   const dt = Math.min((now - last) / 1000, 0.1);
   last = now;
   time = now / 1000;
+  if (heldKeys.length && time - lastMove >= STEP_TIME) move(...KEYS[heldKeys.at(-1)]);
 
   // Ease drawn positions toward grid positions for smooth steps.
   for (const a of [player, npc, ...enemies]) {
@@ -942,13 +943,27 @@ const KEYS = {
 };
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 
+// Held movement keys, most recent last. frame() keeps stepping while one is
+// down, so walking starts right away instead of waiting for key repeat.
+const heldKeys = [];
+const STEP_TIME = 0.16;
+
 window.addEventListener("keydown", (event) => {
   if (event.code === "KeyR") return reset();
   const dir = KEYS[event.code];
   if (!dir) return;
   event.preventDefault();
+  if (event.repeat) return;
+  if (!heldKeys.includes(event.code)) heldKeys.push(event.code);
   move(...dir);
 });
+
+window.addEventListener("keyup", (event) => {
+  const i = heldKeys.indexOf(event.code);
+  if (i >= 0) heldKeys.splice(i, 1);
+});
+
+window.addEventListener("blur", () => { heldKeys.length = 0; });
 
 // Touch pad: press and hold to keep walking.
 document.querySelectorAll(".pad button").forEach((btn) => {

@@ -1,0 +1,577 @@
+/* The game area is always an exact 16:9 rectangle, as large as fits.
+   script.js sets #stage's size and --u (1/16 of the game width, in CSS px);
+   everything is positioned and sized in --u so the layout never changes. */
+:root {
+  color-scheme: dark;
+  font-family: "Trebuchet MS", sans-serif;
+  --u: 60px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+body {
+  display: grid;
+  place-items: center;
+}
+
+#stage {
+  position: relative;
+  overflow: clip;
+  color: #fff;
+  font-size: calc(var(--u) * 0.2);
+  background:
+    radial-gradient(ellipse at 50% 50%, #5a3d22 0%, #3b2614 60%, #24170c 100%);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+[hidden] { display: none !important; }
+
+/* ---------- Table ---------- */
+
+#table {
+  position: absolute;
+  left: calc(var(--u) * 2.8);
+  top: calc(var(--u) * 1.15);
+  width: calc(var(--u) * 10.4);
+  height: calc(var(--u) * 5.8);
+  border: calc(var(--u) * 0.08) solid #2a1a0d;
+  border-radius: calc(var(--u) * 0.5);
+  background:
+    radial-gradient(ellipse at 50% 50%, #3f7a4a 0%, #2c5a37 70%, #224a2c 100%);
+  box-shadow: inset 0 0 calc(var(--u) * 0.6) #0008, 0 0 0 calc(var(--u) * 0.04) #8a6338;
+}
+
+#table .line {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  top: 50%;
+  border-top: calc(var(--u) * 0.03) dashed #ffffff30;
+}
+
+.board {
+  position: absolute;
+  left: calc(var(--u) * 3);
+  width: calc(var(--u) * 10);
+  height: calc(var(--u) * 2.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--u) * 0.28);
+}
+
+#foe-board { top: calc(var(--u) * 1.3); }
+#you-board { top: calc(var(--u) * 4.5); }
+#you-board.drop { background: #ffffff14; border-radius: calc(var(--u) * 0.3); }
+
+/* ---------- Minions on the board ---------- */
+
+.minion {
+  position: relative;
+  isolation: isolate;
+  width: calc(var(--u) * 1.45);
+  height: calc(var(--u) * 1.9);
+  flex: none;
+  transition: transform 0.15s;
+}
+
+.minion .portrait,
+.hero .portrait {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 35%, #8b6a45 0%, #4b331d 75%);
+  border: calc(var(--u) * 0.06) solid #c9a35c;
+  box-shadow: 0 calc(var(--u) * 0.06) calc(var(--u) * 0.14) #000a;
+  transition: box-shadow 0.2s;
+}
+
+.minion .portrait {
+  inset: 0;
+  border-radius: 50% / 42%;
+  font-size: calc(var(--u) * 0.8);
+}
+
+.minion.taunt::before {
+  content: "";
+  position: absolute;
+  inset: calc(var(--u) * -0.14) calc(var(--u) * -0.16) calc(var(--u) * -0.12);
+  z-index: -1;
+  background: linear-gradient(180deg, #c3c8cf, #6a7078);
+  clip-path: polygon(50% 0, 100% 10%, 100% 62%, 50% 100%, 0 62%, 0 10%);
+}
+
+.minion.shield .portrait::after {
+  content: "";
+  position: absolute;
+  inset: calc(var(--u) * -0.12);
+  border-radius: inherit;
+  border: calc(var(--u) * 0.05) solid #ffe68a;
+  background: #ffe27a26;
+  box-shadow: 0 0 calc(var(--u) * 0.25) #ffd84a;
+}
+
+.minion.ready .portrait { box-shadow: 0 0 calc(var(--u) * 0.1) calc(var(--u) * 0.06) #4cff7a; }
+.minion.selected { transform: translateY(calc(var(--u) * -0.12)) scale(1.06); }
+.minion.sleeping .portrait::before {
+  content: "💤";
+  position: absolute;
+  top: calc(var(--u) * -0.05);
+  right: calc(var(--u) * -0.1);
+  font-size: calc(var(--u) * 0.3);
+}
+
+.minion.dying { animation: die 0.45s forwards; }
+
+@keyframes die {
+  to { opacity: 0; transform: scale(0.6) rotate(-8deg); filter: grayscale(1); }
+}
+
+.stat {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: calc(var(--u) * 0.48);
+  height: calc(var(--u) * 0.48);
+  border: calc(var(--u) * 0.035) solid #1a1008;
+  border-radius: 50%;
+  font-weight: bold;
+  font-size: calc(var(--u) * 0.28);
+  text-shadow: 0 0 calc(var(--u) * 0.05) #000, 0 0 calc(var(--u) * 0.05) #000;
+  z-index: 1;
+}
+
+.atk { background: radial-gradient(circle at 40% 35%, #ffd970, #c08a12); left: calc(var(--u) * -0.1); bottom: calc(var(--u) * -0.1); }
+.hp { background: radial-gradient(circle at 40% 35%, #ff7a6a, #a51f17); right: calc(var(--u) * -0.1); bottom: calc(var(--u) * -0.1); }
+.hp.hurt { color: #ffb0a8; }
+.atk.buffed, .hp.buffed { color: #8dff9c; }
+
+/* Valid targets pulse red while you aim something. */
+.targetable .portrait { animation: aim 0.9s infinite alternate; }
+
+@keyframes aim {
+  from { box-shadow: 0 0 calc(var(--u) * 0.06) calc(var(--u) * 0.04) #ff4a3a; }
+  to { box-shadow: 0 0 calc(var(--u) * 0.3) calc(var(--u) * 0.1) #ff4a3a; }
+}
+
+/* ---------- Heroes ---------- */
+
+.hero {
+  position: absolute;
+  left: calc(var(--u) * 0.5);
+  width: calc(var(--u) * 1.9);
+  height: calc(var(--u) * 2.1);
+}
+
+#foe-hero { top: calc(var(--u) * 0.35); }
+#you-hero { top: calc(var(--u) * 6.55); }
+
+.hero .portrait {
+  inset: 0 0 calc(var(--u) * 0.35);
+  border-radius: calc(var(--u) * 0.9) calc(var(--u) * 0.9) calc(var(--u) * 0.2) calc(var(--u) * 0.2);
+  font-size: calc(var(--u) * 1.05);
+}
+
+.hero .hp {
+  width: calc(var(--u) * 0.6);
+  height: calc(var(--u) * 0.6);
+  right: calc(var(--u) * -0.15);
+  bottom: calc(var(--u) * 0.15);
+  font-size: calc(var(--u) * 0.32);
+}
+
+.hero .name {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: calc(var(--u) * 0.2);
+  font-weight: bold;
+  text-shadow: 0 calc(var(--u) * 0.02) 0 #000;
+}
+
+.hero.turn .portrait { border-color: #ffe68a; }
+
+/* ---------- Mana, decks, end turn ---------- */
+
+.mana {
+  position: absolute;
+  right: calc(var(--u) * 0.3);
+  bottom: calc(var(--u) * 0.3);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 0.05);
+}
+
+.mana b {
+  margin-right: calc(var(--u) * 0.08);
+  font-size: calc(var(--u) * 0.3);
+  text-shadow: 0 calc(var(--u) * 0.02) 0 #000;
+}
+
+.gem {
+  width: calc(var(--u) * 0.2);
+  height: calc(var(--u) * 0.28);
+  clip-path: polygon(50% 0, 100% 35%, 50% 100%, 0 35%);
+  background: linear-gradient(160deg, #9fd2ff, #2f6fd6 60%, #163c8a);
+}
+
+.gem.spent { background: #1a2238; }
+
+.mana-text {
+  position: absolute;
+  left: calc(var(--u) * 0.5);
+  top: calc(var(--u) * 2.55);
+  width: calc(var(--u) * 1.9);
+  text-align: center;
+  color: #9fd2ff;
+  font-weight: bold;
+}
+
+.deck {
+  position: absolute;
+  right: calc(var(--u) * 0.45);
+  width: calc(var(--u) * 1.9);
+  padding: calc(var(--u) * 0.08);
+  border-radius: calc(var(--u) * 0.12);
+  background: #0006;
+  text-align: center;
+  font-size: calc(var(--u) * 0.18);
+  line-height: 1.35;
+}
+
+#foe-deck { top: calc(var(--u) * 1.4); }
+#you-deck { top: calc(var(--u) * 5.95); }
+
+#end-turn {
+  position: absolute;
+  right: calc(var(--u) * 0.45);
+  top: calc(var(--u) * 3.6);
+  width: calc(var(--u) * 1.9);
+  height: calc(var(--u) * 0.85);
+  border: calc(var(--u) * 0.05) solid #3a2410;
+  border-radius: calc(var(--u) * 0.2);
+  background: linear-gradient(180deg, #f2c35a, #b9821f);
+  color: #2a1606;
+  font: bold calc(var(--u) * 0.26) "Trebuchet MS", sans-serif;
+  cursor: pointer;
+  box-shadow: 0 calc(var(--u) * 0.06) 0 #3a2410;
+}
+
+#end-turn.done { background: linear-gradient(180deg, #8dff9c, #2fa94a); animation: nudge 1s infinite alternate; }
+#end-turn:disabled { background: #6b5a45; color: #2a2016; cursor: default; animation: none; }
+
+@keyframes nudge { to { box-shadow: 0 calc(var(--u) * 0.06) 0 #3a2410, 0 0 calc(var(--u) * 0.3) #8dff9c; } }
+
+/* ---------- Cards ---------- */
+
+.card {
+  position: absolute;
+  width: calc(var(--u) * 1.6);
+  height: calc(var(--u) * 2.2);
+  padding: calc(var(--u) * 0.1);
+  border: calc(var(--u) * 0.05) solid #6b4a2b;
+  border-radius: calc(var(--u) * 0.14);
+  background: linear-gradient(180deg, #f6ead0, #d8c28c);
+  color: #2a1a0c;
+  box-shadow: 0 calc(var(--u) * 0.06) calc(var(--u) * 0.15) #000b;
+  text-align: center;
+}
+
+.card.spell { background: linear-gradient(180deg, #e2eaf8, #a8bbdf); border-color: #34497a; }
+
+.card .cost {
+  position: absolute;
+  top: calc(var(--u) * -0.14);
+  left: calc(var(--u) * -0.14);
+  display: grid;
+  place-items: center;
+  width: calc(var(--u) * 0.5);
+  height: calc(var(--u) * 0.5);
+  border: calc(var(--u) * 0.035) solid #0e1d40;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #8cc4ff, #2559c4);
+  color: #fff;
+  font-weight: bold;
+  font-size: calc(var(--u) * 0.3);
+  text-shadow: 0 0 calc(var(--u) * 0.05) #000;
+}
+
+.card .art {
+  display: grid;
+  place-items: center;
+  height: calc(var(--u) * 0.8);
+  border-radius: 50% / 45%;
+  background: radial-gradient(circle at 50% 40%, #8b6a45, #3e2a17);
+  font-size: calc(var(--u) * 0.5);
+}
+
+.card.spell .art { border-radius: calc(var(--u) * 0.1); background: radial-gradient(circle at 50% 40%, #5a74b8, #1d2a55); }
+
+.card .name {
+  margin: calc(var(--u) * 0.05) calc(var(--u) * -0.06) 0;
+  padding: calc(var(--u) * 0.02) 0;
+  border-radius: calc(var(--u) * 0.05);
+  background: #5b3b1e;
+  color: #fff3d6;
+  font-weight: bold;
+  font-size: calc(var(--u) * 0.15);
+  white-space: nowrap;
+}
+
+.card.spell .name { background: #2a3d6e; }
+
+.card .text {
+  margin-top: calc(var(--u) * 0.05);
+  font-size: calc(var(--u) * 0.125);
+  line-height: 1.2;
+}
+
+.card .stat { bottom: calc(var(--u) * -0.12); }
+.card .atk { left: calc(var(--u) * -0.12); }
+.card .hp { right: calc(var(--u) * -0.12); }
+
+/* The hand is fanned along the bottom edge; script.js sets --x/--y/--r. */
+#hand, #foe-hand { position: absolute; inset: 0; pointer-events: none; }
+#hand .card { pointer-events: auto; }
+#hand .card {
+  left: 0;
+  top: 0;
+  transform: translate(calc(var(--x) * var(--u)), calc(var(--y) * var(--u))) rotate(var(--r));
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+}
+
+#hand .card.playable { box-shadow: 0 0 calc(var(--u) * 0.06) calc(var(--u) * 0.05) #4cff7a, 0 calc(var(--u) * 0.06) calc(var(--u) * 0.15) #000b; }
+
+#hand .card.selected { z-index: 5; transform: translate(calc(var(--x) * var(--u)), calc(var(--u) * 5.5)) scale(1.3); }
+#hand .card.held { z-index: 6; transition: none; }
+
+@media (hover: hover) {
+  #hand .card:hover:not(.held) { z-index: 5; transform: translate(calc(var(--x) * var(--u)), calc(var(--u) * 5.5)) scale(1.3); }
+}
+
+#foe-hand .back {
+  position: absolute;
+  top: calc(var(--u) * -0.75);
+  left: 0;
+  width: calc(var(--u) * 1);
+  height: calc(var(--u) * 1.4);
+  transform: translateX(calc(var(--x) * var(--u))) rotate(var(--r));
+  border: calc(var(--u) * 0.04) solid #6b4a2b;
+  border-radius: calc(var(--u) * 0.1);
+  background:
+    repeating-linear-gradient(45deg, #7a2a1e 0 calc(var(--u) * 0.08), #5a1c14 calc(var(--u) * 0.08) calc(var(--u) * 0.16));
+  box-shadow: 0 calc(var(--u) * 0.04) calc(var(--u) * 0.1) #000a;
+  transition: transform 0.2s;
+}
+
+/* Larger copy of whatever card you point at, for reading. */
+#inspect {
+  position: absolute;
+  left: calc(var(--u) * 0.35);
+  top: calc(var(--u) * 2.95);
+  width: calc(var(--u) * 1.6);
+  height: calc(var(--u) * 2.2);
+  transform: scale(1.45);
+  transform-origin: 0 0;
+  pointer-events: none;
+  z-index: 8;
+}
+
+#inspect .card, #reveal .card { position: relative; }
+#inspect .keywords {
+  margin-top: calc(var(--u) * 0.2);
+  font-size: calc(var(--u) * 0.12);
+  line-height: 1.3;
+  color: #ffe9b8;
+  text-shadow: 0 0 calc(var(--u) * 0.04) #000;
+}
+
+/* The opponent's card shown big in the middle when they play it. */
+#reveal {
+  position: absolute;
+  left: calc(var(--u) * 6.85);
+  top: calc(var(--u) * 2.4);
+  width: calc(var(--u) * 1.6);
+  height: calc(var(--u) * 2.2);
+  transform: scale(1.5);
+  transform-origin: 50% 50%;
+  pointer-events: none;
+  z-index: 9;
+  animation: reveal 0.25s;
+}
+
+@keyframes reveal { from { opacity: 0; transform: scale(0.8) translateY(calc(var(--u) * -1)); } }
+
+/* ---------- Aiming arrow, effects, overlays ---------- */
+
+#arrow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 7;
+  overflow: visible;
+}
+
+#arrow path {
+  fill: none;
+  stroke: #ff5a3a;
+  stroke-width: 0.12;
+  stroke-linecap: round;
+  stroke-dasharray: 0.25 0.12;
+  filter: drop-shadow(0 0 0.05px #000);
+}
+
+#arrow circle { fill: #ffd34a; stroke: #7a1c0c; stroke-width: 0.04; }
+
+#fx { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+
+.pop {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-weight: bold;
+  font-size: calc(var(--u) * 0.45);
+  text-shadow: 0 0 calc(var(--u) * 0.06) #000, 0 0 calc(var(--u) * 0.06) #000;
+  animation: pop 1s forwards;
+  white-space: nowrap;
+}
+
+.pop.damage { color: #ff5a4a; }
+.pop.heal { color: #6dff86; }
+.pop.info { color: #ffe68a; font-size: calc(var(--u) * 0.3); }
+
+@keyframes pop {
+  0% { opacity: 0; transform: translate(-50%, -30%) scale(0.6); }
+  15% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+  70% { opacity: 1; transform: translate(-50%, -90%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -120%) scale(1); }
+}
+
+.shake { animation: shake 0.3s; }
+
+@keyframes shake {
+  25% { translate: calc(var(--u) * -0.06) 0; }
+  75% { translate: calc(var(--u) * 0.06) 0; }
+}
+
+#banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--u) * 3.55);
+  padding: calc(var(--u) * 0.2) 0;
+  background: linear-gradient(90deg, transparent, #000c 20%, #000c 80%, transparent);
+  text-align: center;
+  font-size: calc(var(--u) * 0.5);
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  pointer-events: none;
+  z-index: 11;
+  animation: banner 1.4s forwards;
+}
+
+#banner small {
+  display: block;
+  margin-top: calc(var(--u) * 0.08);
+  font-size: calc(var(--u) * 0.2);
+  font-weight: normal;
+  letter-spacing: 0;
+  opacity: 0.85;
+}
+
+@keyframes banner {
+  0% { opacity: 0; transform: scaleY(0.4); }
+  15%, 80% { opacity: 1; transform: none; }
+  100% { opacity: 0; }
+}
+
+#result {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--u) * 0.4);
+  background: #000a;
+  z-index: 12;
+}
+
+#result strong { font-size: calc(var(--u) * 1); text-shadow: 0 0 calc(var(--u) * 0.2) #000; }
+#result.win strong { color: #ffd970; }
+#result.lose strong { color: #ff7a6a; }
+
+#result button {
+  padding: calc(var(--u) * 0.15) calc(var(--u) * 0.5);
+  border: calc(var(--u) * 0.05) solid #3a2410;
+  border-radius: calc(var(--u) * 0.2);
+  background: linear-gradient(180deg, #f2c35a, #b9821f);
+  color: #2a1606;
+  font: bold calc(var(--u) * 0.3) "Trebuchet MS", sans-serif;
+  cursor: pointer;
+}
+
+.buttons {
+  position: absolute;
+  top: calc(var(--u) * 0.25);
+  right: calc(var(--u) * 0.25);
+  display: flex;
+  gap: calc(var(--u) * 0.12);
+  z-index: 13;
+}
+
+.buttons button,
+.buttons a {
+  display: grid;
+  place-items: center;
+  width: calc(var(--u) * 0.55);
+  height: calc(var(--u) * 0.55);
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--u) * 0.1);
+  background: #0008;
+  color: #fff;
+  font: calc(var(--u) * 0.28) "Trebuchet MS", sans-serif;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.buttons button:hover,
+.buttons a:hover { background: #5b3b1ed0; }
+
+button:focus-visible,
+a:focus-visible { outline: 2px solid #ffe68a; outline-offset: 2px; }
+
+.rotate {
+  position: fixed;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  background: #000;
+  color: #fff;
+  font: 18px "Trebuchet MS", sans-serif;
+  text-align: center;
+}
+
+.rotate span { font-size: 56px; }
+
+@media (orientation: portrait) and (pointer: coarse) {
+  .rotate { display: flex; }
+}

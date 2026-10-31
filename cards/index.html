@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <title>Card Duel · Testing</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <div id="stage">
+    <div id="table" aria-hidden="true"><div class="line"></div></div>
+
+    <div id="foe-hero" class="hero"></div>
+    <div id="foe-mana" class="mana-text"></div>
+    <div id="foe-hand"></div>
+    <div id="foe-board" class="board"></div>
+
+    <div id="you-board" class="board"></div>
+    <div id="you-hero" class="hero"></div>
+    <div id="you-mana" class="mana"></div>
+    <div id="hand"></div>
+
+    <div id="foe-deck" class="deck"></div>
+    <div id="you-deck" class="deck"></div>
+    <button id="end-turn" type="button">End Turn</button>
+
+    <div id="inspect" hidden></div>
+    <div id="reveal" hidden></div>
+    <svg id="arrow" viewBox="0 0 16 9" preserveAspectRatio="none" aria-hidden="true">
+      <path></path><circle r="0.14"></circle>
+    </svg>
+    <div id="fx" aria-hidden="true"></div>
+    <div id="banner" hidden></div>
+    <div id="result" hidden>
+      <strong></strong>
+      <button type="button">Play again</button>
+    </div>
+
+    <div class="buttons">
+      <button id="fullscreen" type="button" aria-label="Toggle fullscreen" hidden>⛶</button>
+      <button id="restart" type="button" aria-label="Restart">↻</button>
+      <a href="../" aria-label="Back to all tests">✕</a>
+    </div>
+  </div>
+  <div class="rotate" role="alert">
+    <span>⟳</span>
+    Rotate your device to landscape
+  </div>
+</body>
+</html>

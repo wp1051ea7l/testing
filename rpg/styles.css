@@ -1,124 +1,116 @@
+/* The game area is always an exact 16:9 rectangle, as large as fits.
+   script.js sets #stage's size and --u (one tile, in CSS px). */
 :root {
-  color-scheme: light;
+  color-scheme: dark;
   font-family: "Trebuchet MS", sans-serif;
-  background: #f4f6f1;
-  color: #202b25;
+  --u: 40px;
 }
 
 * { box-sizing: border-box; }
 
-body {
-  min-height: 100vh;
+html, body {
+  height: 100%;
   margin: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+body {
   display: grid;
   place-items: center;
-  padding: 24px;
-  background-image: radial-gradient(#d9e2d7 1px, transparent 1px);
-  background-size: 22px 22px;
 }
 
-main {
-  width: min(100%, 640px);
-  padding: 40px;
-  border: 1px solid #d8dfd7;
-  border-radius: 8px;
-  background: #fffefa;
-  box-shadow: 0 16px 40px #26392b12;
-}
-
-.back {
-  display: inline-block;
-  margin-bottom: 20px;
-  color: #35684b;
-  font-size: 14px;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.back:hover { text-decoration: underline; }
-
-.status {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #35684b;
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.status::before {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #58a773;
-  content: "";
-}
-
-h1 {
-  margin: 18px 0 10px;
-  font-size: clamp(30px, 7vw, 42px);
-  line-height: 1.05;
-}
-
-p { color: #5b665e; line-height: 1.6; }
-
-button {
-  padding: 11px 16px;
-  border: 0;
-  border-radius: 5px;
-  background: #245c3b;
-  color: white;
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-button:hover { background: #19482d; }
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible { outline: 3px solid #9dc9a8; outline-offset: 3px; }
-
-button.secondary { background: #e4ebe2; color: #245c3b; }
-button.secondary:hover { background: #d4dfd2; }
-
-@media (max-width: 480px) {
-  main { padding: 28px 24px; }
+#stage {
+  position: relative;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 canvas {
   display: block;
   width: 100%;
-  height: auto;
-  margin-top: 16px;
-  border: 1px solid #d8dfd7;
-  border-radius: 5px;
-  background: #1d2b22;
+  height: 100%;
+  outline: none;
 }
-canvas:focus-visible { outline: 3px solid #9dc9a8; outline-offset: 3px; }
-.hud {
+
+.buttons {
+  position: absolute;
+  top: calc(var(--u) * 0.25);
+  right: calc(var(--u) * 0.25);
   display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 12px;
-  font-size: 14px;
+  gap: calc(var(--u) * 0.15);
 }
-#stats { color: #245c3b; font-weight: 700; font-variant-numeric: tabular-nums; }
-#log { color: #5b665e; }
-.pad {
+
+.buttons button,
+.buttons a,
+.pad button {
   display: grid;
-  grid-template-columns: repeat(3, 52px);
-  grid-template-areas: ". up ." "left down right";
-  gap: 6px;
-  justify-content: center;
-  margin-top: 16px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--u) * 0.15);
+  background: #0f1a14b0;
+  color: #fff;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
 }
-.pad button { padding: 12px 0; touch-action: manipulation; }
+
+.buttons button,
+.buttons a {
+  width: calc(var(--u) * 0.75);
+  height: calc(var(--u) * 0.75);
+  font-size: calc(var(--u) * 0.4);
+}
+
+.buttons button:hover,
+.buttons a:hover { background: #245c3bd0; }
+
+button:focus-visible,
+a:focus-visible { outline: 2px solid #9dc9a8; outline-offset: 2px; }
+
+.pad {
+  position: absolute;
+  left: calc(var(--u) * 0.3);
+  bottom: calc(var(--u) * 0.3);
+  display: none;
+  grid-template-columns: repeat(3, calc(var(--u) * 1.1));
+  grid-template-rows: repeat(2, calc(var(--u) * 1.1));
+  grid-template-areas: ". up ." "left down right";
+  gap: calc(var(--u) * 0.1);
+}
+
+.pad button {
+  font-size: calc(var(--u) * 0.45);
+  touch-action: none;
+}
+
+.pad button:active { background: #245c3bd0; }
 .pad [data-dir="up"] { grid-area: up; }
 .pad [data-dir="left"] { grid-area: left; }
 .pad [data-dir="down"] { grid-area: down; }
 .pad [data-dir="right"] { grid-area: right; }
-@media (hover: hover) and (pointer: fine) { .pad { display: none; } }
-.row { display: flex; gap: 12px; margin-top: 12px; }
+
+@media (pointer: coarse) { .pad { display: grid; } }
+
+.rotate {
+  position: fixed;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  background: #000;
+  color: #fff;
+  font-size: 18px;
+  text-align: center;
+}
+
+.rotate span { font-size: 56px; }
+
+@media (orientation: portrait) and (pointer: coarse) {
+  .rotate { display: flex; }
+}

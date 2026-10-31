@@ -1,31 +1,76 @@
-const canvas = document.querySelector("#stage");
+const canvas = document.querySelector("#game");
 const ctx = canvas.getContext("2d");
-const statsEl = document.querySelector("#stats");
-const logEl = document.querySelector("#log");
+const stage = document.querySelector("#stage");
+
+// Drawing happens in "world units": one tile is TILE units, and the view is
+// always VIEW_W × VIEW_H tiles (16:9). resize() maps units to device pixels.
 const TILE = 32;
+const VIEW_W = 16;
+const VIEW_H = 9;
+const SCREEN_W = VIEW_W * TILE;
+const SCREEN_H = VIEW_H * TILE;
 
-// # tree, ~ water, = bridge, : path, W wall, D locked door, C chest,
-// h potion, P player, S sage, g slime, B slime king, . grass
+// # tree, ~ water, = bridge, : path, s sand, , flowers, r rock, H hut,
+// W wall, D locked door, C key chest, $ gold chest, h potion,
+// P player, S sage, g slime, b blue slime, B slime king, . grass
 const MAP = [
-  "################",
-  "#P..:....~~~...#",
-  "#...:....~~~.g.#",
-  "#.S.:::::===...#",
-  "#...:....~~~...#",
-  "#.g.:....~~~.C.#",
-  "#...:....~~~...#",
-  "#...:::::::::..#",
-  "#WWWWWWDWWWW...#",
-  "#W.........W.g.#",
-  "#W....B..h.W...#",
-  "################",
+  "################################################",
+  "#...,..,..,.........~~~..........#####.###....$#",
+  "#,.H,.H,#,#.........~~~...g....................#",
+  "#.....,#.,#H.....r..~~~.......:::::::::::......#",
+  "##,#....###,.......#~~~.......:.........:...h..#",
+  "####..S.............~~~.......:.#...###.:......#",
+  "##,#.:::::::::::::::===::::::::.##...#..:......#",
+  "#.,..P..:,..........~~~.......:.#.......:...##.#",
+  "#.......:.###.......~~~#.##...:.........:...##.#",
+  "#..Hr,..:.##H#,,g..#~~~##.....:......#....C.##.#",
+  "#,,.....:.,###......~~~#......:..b..##.........#",
+  "#.##...,:..,##,.....~~~#......:.....##.........#",
+  "#.###...:...........~~~#..h...:.............b..#",
+  "#..##...:...........~~~.......:................#",
+  "#.....#.:...g.......~~~.......:::::::::........#",
+  "#....##.:.......$...~~~...............:...###..#",
+  "#.......:...........~~~...............:....#...#",
+  "#.......:..###......~~~....g.......b..:..r.....#",
+  "#...g...:...####....~~~...............:........#",
+  "#.......:...........~~~...............:.....####",
+  "#.......:...........~~~~~~~~~~~~~~~~~~=~~~~~~~~#",
+  "#####.#.:.##..g.....~~~~~~~~~~~~~~~~~~=~~~~~~~~#",
+  "######..:.##........~~~~~~~~~~~~~~~~~~=~~~~~~~~#",
+  "#.#.#...:.............................:.#......#",
+  "#.....#.:::::::::::::::::::::::::::::::.#...b..#",
+  "#...ssssss.......h...................:.........#",
+  "#..ss~~~~ss..........#........WWWWWWWDWWWWWWWW.#",
+  "##s~~~~~~~~s............g.....W..............W.#",
+  "##s~~~~~~~~s....##............W...b......b...W.#",
+  "##s~~~~~~~~s....r.............W..W........W..W.#",
+  "##s~~~~~~~~s.$...........###..W....h.........W.#",
+  "###ss~~~~ss........g.......#..W..W........W..W##",
+  "#...ssssss....................W......B.......W##",
+  "#.......#.....##........g.....W..............W##",
+  "#.............#####...........WWWWWWWWWWWWWWWW.#",
+  "################################################",
 ];
-const SOLID = new Set(["#", "~", "W", "D", "C"]);
+const WORLD_W = MAP[0].length;
+const WORLD_H = MAP.length;
+const SOLID = new Set(["#", "~", "W", "D", "C", "$", "o", "r", "H"]);
+const ENEMIES = {
+  g: { name: "slime", hp: 3, atk: 1, xp: 2, gold: 3, color: "#4fc46b" },
+  b: { name: "blue slime", hp: 6, atk: 2, xp: 4, gold: 6, color: "#4a8be0" },
+  B: { name: "slime king", hp: 16, atk: 3, xp: 10, gold: 50, color: "#d1405a", boss: true },
+};
+const MINIMAP_COLORS = {
+  "#": "#2f6b34", "~": "#3d7fc4", "=": "#a8743f", ":": "#d6bd85", s: "#e3d08f",
+  W: "#7d7f86", D: "#8a5a2e", H: "#b5523b", r: "#8c8c8c", C: "#ffd75e", $: "#ffd75e",
+};
 
-let tiles, player, enemies, npc, effects, gameState, time;
+let tiles, seen, player, enemies, npc, effects, gameState, message, time = 0;
+let unit = TILE;
+let lastMove = 0;
 
 function reset() {
   tiles = MAP.map((row) => row.split(""));
+  seen = tiles.map((row) => row.map(() => false));
   enemies = [];
   effects = [];
   gameState = "play";
@@ -33,17 +78,26 @@ function reset() {
     const actor = { x, y, dx: x, dy: y, flash: 0 };
     if (ch === "P") player = { ...actor, hp: 10, maxHp: 10, atk: 1, xp: 0, level: 1, gold: 0, key: false, facing: 1 };
     if (ch === "S") npc = actor;
-    if (ch === "g") enemies.push({ ...actor, hp: 3, atk: 1, boss: false });
-    if (ch === "B") enemies.push({ ...actor, hp: 10, atk: 2, boss: true });
-    if ("PSgB".includes(ch)) row[x] = ".";
+    if (ENEMIES[ch]) enemies.push({ ...actor, ...ENEMIES[ch] });
+    if ("PS".includes(ch) || ENEMIES[ch]) row[x] = ".";
   }));
-  say("Talk to the sage on the left.");
+  say("Find the sage in the village. Arrow keys or WASD to move.");
 }
 
-function say(text) { logEl.textContent = text; }
+// Largest exact 16:9 area that fits: unit = min(width / 16, height / 9),
+// floored to whole device pixels. The leftover space stays black.
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  unit = Math.max(1, Math.floor(Math.min(innerWidth * dpr / VIEW_W, innerHeight * dpr / VIEW_H)));
+  canvas.width = unit * VIEW_W;
+  canvas.height = unit * VIEW_H;
+  stage.style.width = `${canvas.width / dpr}px`;
+  stage.style.height = `${canvas.height / dpr}px`;
+  stage.style.setProperty("--u", `${unit / dpr}px`);
+}
 
-function updateHud() {
-  statsEl.textContent = `Lv ${player.level} · HP ${player.hp}/${player.maxHp} · XP ${player.xp}/${player.level * 4} · Gold ${player.gold}${player.key ? " · 🔑" : ""}`;
+function say(text) {
+  message = { text, time };
 }
 
 function actorAt(x, y) {
@@ -55,7 +109,7 @@ function popup(x, y, text, color) {
 }
 
 function move(mx, my) {
-  if (gameState !== "play") return;
+  if (gameState !== "play" || time - lastMove < 0.09) return;
   if (mx) player.facing = mx;
   const nx = player.x + mx;
   const ny = player.y + my;
@@ -63,21 +117,29 @@ function move(mx, my) {
   const tile = tiles[ny][nx];
 
   if (target === npc) {
-    say(player.key ? "Sage: The king waits behind the door. Good luck!" : "Sage: A key lies in a chest across the bridge.");
+    say(player.key
+      ? "Sage: The slime king's castle lies to the south-east. Good luck!"
+      : "Sage: The slime king hides in the south-east castle. Its key is in a chest in the north-east, across the river.");
   } else if (target) {
     attack(target);
-  } else if (tile === "C") {
-    tiles[ny][nx] = ".";
-    player.key = true;
-    player.gold += 10;
-    popup(nx, ny, "+key", "#ffd75e");
-    say("You found a key and 10 gold!");
+  } else if (tile === "C" || tile === "$") {
+    tiles[ny][nx] = "o";
+    const gold = tile === "C" ? 10 : 25;
+    player.gold += gold;
+    if (tile === "C") {
+      player.key = true;
+      popup(nx, ny, "+key", "#ffd75e");
+      say(`You found the castle key and ${gold} gold!`);
+    } else {
+      popup(nx, ny, `+${gold}`, "#ffd75e");
+      say(`You found ${gold} gold!`);
+    }
   } else if (tile === "D") {
     if (player.key) {
       tiles[ny][nx] = ":";
-      say("The door creaks open...");
+      say("The castle door creaks open...");
     } else {
-      say("The door is locked.");
+      say("The castle door is locked.");
     }
   } else if (!SOLID.has(tile)) {
     player.x = nx;
@@ -91,8 +153,8 @@ function move(mx, my) {
   } else {
     return;
   }
+  lastMove = time;
   enemyTurn();
-  updateHud();
 }
 
 function attack(enemy) {
@@ -100,14 +162,13 @@ function attack(enemy) {
   enemy.hp -= dmg;
   enemy.flash = 1;
   popup(enemy.x, enemy.y, `-${dmg}`, "#fff");
-  if (enemy.hp > 0) return say(`You hit the ${enemy.boss ? "slime king" : "slime"}.`);
+  if (enemy.hp > 0) return say(`You hit the ${enemy.name}.`);
 
   enemies = enemies.filter((e) => e !== enemy);
-  const xp = enemy.boss ? 10 : 2;
-  player.xp += xp;
-  player.gold += enemy.boss ? 50 : 3;
-  say(`Slime defeated! +${xp} XP`);
-  if (player.xp >= player.level * 4) {
+  player.xp += enemy.xp;
+  player.gold += enemy.gold;
+  say(`The ${enemy.name} is defeated! +${enemy.xp} XP`);
+  while (player.xp >= player.level * 4) {
     player.xp -= player.level * 4;
     player.level += 1;
     player.maxHp += 3;
@@ -118,7 +179,7 @@ function attack(enemy) {
   }
   if (enemy.boss) {
     gameState = "won";
-    say("You defeated the slime king! Press R to play again.");
+    say("You defeated the slime king!");
   }
 }
 
@@ -126,7 +187,8 @@ function enemyTurn() {
   for (const e of enemies) {
     const distX = player.x - e.x;
     const distY = player.y - e.y;
-    if (Math.abs(distX) + Math.abs(distY) === 1) {
+    const dist = Math.abs(distX) + Math.abs(distY);
+    if (dist === 1) {
       if (Math.random() < 0.7) {
         player.hp -= e.atk;
         player.flash = 1;
@@ -136,14 +198,14 @@ function enemyTurn() {
     }
     // Chase when close, otherwise wander now and then.
     let step;
-    if (Math.abs(distX) + Math.abs(distY) <= 4) {
+    if (dist <= 4) {
       step = Math.abs(distX) > Math.abs(distY) ? [Math.sign(distX), 0] : [0, Math.sign(distY)];
     } else if (Math.random() < 0.4) {
       step = [[1, 0], [-1, 0], [0, 1], [0, -1]][Math.floor(Math.random() * 4)];
     } else continue;
     const nx = e.x + step[0];
     const ny = e.y + step[1];
-    if (!SOLID.has(tiles[ny][nx]) && !actorAt(nx, ny) && !(nx === player.x && ny === player.y)) {
+    if (!SOLID.has(tiles[ny][nx]) && tiles[ny][nx] !== "=" && !actorAt(nx, ny) && !(nx === player.x && ny === player.y)) {
       e.x = nx;
       e.y = ny;
     }
@@ -151,13 +213,13 @@ function enemyTurn() {
   if (player.hp <= 0) {
     player.hp = 0;
     gameState = "lost";
-    say("You were defeated. Press R to try again.");
+    say("You were defeated.");
   }
 }
 
-// ---------- Drawing ----------
+// ---------- World drawing ----------
 
-// Stable pseudo-random per tile so grass tufts don't flicker.
+// Stable pseudo-random per tile so details don't flicker.
 function hash(x, y, n = 0) {
   const s = Math.sin(x * 127.1 + y * 311.7 + n * 74.7) * 43758.5453;
   return s - Math.floor(s);
@@ -179,56 +241,86 @@ function drawGrass(px, py, x, y) {
   }
 }
 
+function drawWater(px, py) {
+  ctx.fillStyle = "#3d7fc4";
+  ctx.fillRect(px, py, TILE, TILE);
+  ctx.strokeStyle = "#7fb6ea";
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 2; i++) {
+    const wy = py + 10 + i * 13;
+    ctx.beginPath();
+    for (let k = 0; k <= TILE; k += 4) {
+      const off = Math.sin((px + k) / 6 + time * 3 + i * 2) * 2;
+      k ? ctx.lineTo(px + k, wy + off) : ctx.moveTo(px + k, wy + off);
+    }
+    ctx.stroke();
+  }
+}
+
+function drawSpeckled(px, py, x, y, base, speck) {
+  ctx.fillStyle = base;
+  ctx.fillRect(px, py, TILE, TILE);
+  ctx.fillStyle = speck;
+  for (let i = 0; i < 4; i++) {
+    ctx.fillRect(px + hash(x, y, i) * 28, py + hash(x, y, i + 5) * 28, 3, 3);
+  }
+}
+
+function drawWall(px, py) {
+  ctx.fillStyle = "#7d7f86";
+  ctx.fillRect(px, py, TILE, TILE);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(px, py, TILE, TILE);
+  ctx.clip();
+  ctx.strokeStyle = "#5a5c63";
+  ctx.lineWidth = 2;
+  for (let r = 0; r < 4; r++) {
+    for (let k = r % 2 ? -8 : 0; k < TILE; k += 16) ctx.strokeRect(px + k, py + r * 8, 16, 8);
+  }
+  ctx.restore();
+}
+
+function drawChest(px, py, open) {
+  ctx.fillStyle = "#8a5a2e";
+  ctx.fillRect(px + 5, py + 12, 22, 14);
+  if (open) {
+    ctx.fillStyle = "#2a1a0e";
+    ctx.fillRect(px + 7, py + 12, 18, 4);
+    ctx.fillStyle = "#a8743f";
+    ctx.fillRect(px + 5, py + 3, 22, 8);
+    return;
+  }
+  ctx.fillStyle = "#a8743f";
+  ctx.fillRect(px + 5, py + 8, 22, 7);
+  ctx.fillStyle = "#ffd75e";
+  ctx.fillRect(px + 5, py + 14, 22, 2);
+  ctx.fillRect(px + 14, py + 13, 4, 6);
+}
+
 function drawTile(ch, x, y) {
   const px = x * TILE;
   const py = y * TILE;
-  if (ch === "~") {
-    ctx.fillStyle = "#3d7fc4";
-    ctx.fillRect(px, py, TILE, TILE);
-    ctx.strokeStyle = "#7fb6ea";
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 2; i++) {
-      const wy = py + 10 + i * 13;
-      ctx.beginPath();
-      for (let k = 0; k <= TILE; k += 4) {
-        const off = Math.sin((px + k) / 6 + time * 3 + i * 2) * 2;
-        k ? ctx.lineTo(px + k, wy + off) : ctx.moveTo(px + k, wy + off);
-      }
-      ctx.stroke();
-    }
-    return;
-  }
-  if (ch === "W") {
-    ctx.fillStyle = "#7d7f86";
-    ctx.fillRect(px, py, TILE, TILE);
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(px, py, TILE, TILE);
-    ctx.clip();
-    ctx.strokeStyle = "#5a5c63";
-    ctx.lineWidth = 2;
-    for (let r = 0; r < 4; r++) {
-      for (let k = r % 2 ? -8 : 0; k < TILE; k += 16) ctx.strokeRect(px + k, py + r * 8, 16, 8);
-    }
-    ctx.restore();
-    return;
-  }
+  if (ch === "~") return drawWater(px, py);
+  if (ch === "W") return drawWall(px, py);
+  if (ch === ":") return drawSpeckled(px, py, x, y, "#d6bd85", "#bfa26a");
+  if (ch === "s") return drawSpeckled(px, py, x, y, "#e3d08f", "#cdb672");
   if (ch === "=") {
-    ctx.fillStyle = "#3d7fc4";
-    ctx.fillRect(px, py, TILE, TILE);
-    ctx.fillStyle = "#a8743f";
-    ctx.fillRect(px, py + 3, TILE, TILE - 6);
-    ctx.strokeStyle = "#7a5128";
-    for (let k = 0; k < TILE; k += 8) ctx.strokeRect(px + k, py + 3, 8, TILE - 6);
-    return;
-  }
-  if (ch === ":") {
-    ctx.fillStyle = "#d6bd85";
-    ctx.fillRect(px, py, TILE, TILE);
-    ctx.fillStyle = "#bfa26a";
-    for (let i = 0; i < 4; i++) {
-      ctx.fillRect(px + hash(x, y, i) * 28, py + hash(x, y, i + 5) * 28, 3, 3);
+    drawWater(px, py);
+    const vertical = tiles[y - 1]?.[x] === "=" || tiles[y + 1]?.[x] === "=";
+    ctx.save();
+    if (vertical) {
+      ctx.translate(px + TILE, py);
+      ctx.rotate(Math.PI / 2);
+    } else {
+      ctx.translate(px, py);
     }
+    ctx.fillStyle = "#a8743f";
+    ctx.fillRect(0, 3, TILE, TILE - 6);
+    ctx.strokeStyle = "#7a5128";
+    ctx.lineWidth = 1;
+    for (let k = 0; k < TILE; k += 8) ctx.strokeRect(k, 3, 8, TILE - 6);
+    ctx.restore();
     return;
   }
 
@@ -244,9 +336,42 @@ function drawTile(ch, x, y) {
     ctx.beginPath();
     ctx.arc(px + 12, py + 10, 6, 0, Math.PI * 2);
     ctx.fill();
+  } else if (ch === ",") {
+    const petals = ["#f5e663", "#f28bb3", "#ffffff"];
+    for (let i = 0; i < 3; i++) {
+      const fx = px + 6 + hash(x, y, i + 20) * 20;
+      const fy = py + 6 + hash(x, y, i + 30) * 20;
+      ctx.fillStyle = petals[i];
+      ctx.beginPath();
+      ctx.arc(fx, fy, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#e08a2c";
+      ctx.fillRect(fx - 1, fy - 1, 2, 2);
+    }
+  } else if (ch === "r") {
+    ctx.fillStyle = "#6f7177";
+    ctx.beginPath();
+    ctx.ellipse(px + 16, py + 20, 12, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#9a9ca3";
+    ctx.beginPath();
+    ctx.ellipse(px + 13, py + 17, 6, 4, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (ch === "H") {
+    ctx.fillStyle = "#c9a46a";
+    ctx.fillRect(px + 5, py + 15, 22, 15);
+    ctx.fillStyle = "#b5523b";
+    ctx.beginPath();
+    ctx.moveTo(px + 2, py + 16);
+    ctx.lineTo(px + 16, py + 3);
+    ctx.lineTo(px + 30, py + 16);
+    ctx.fill();
+    ctx.fillStyle = "#6b4426";
+    ctx.fillRect(px + 13, py + 21, 7, 9);
+    ctx.fillStyle = "#ffe08a";
+    ctx.fillRect(px + 7, py + 19, 4, 4);
   } else if (ch === "D") {
-    ctx.fillStyle = "#7d7f86";
-    ctx.fillRect(px, py, TILE, TILE);
+    drawWall(px, py);
     ctx.fillStyle = "#8a5a2e";
     ctx.beginPath();
     ctx.roundRect(px + 4, py + 2, 24, 30, [12, 12, 0, 0]);
@@ -256,14 +381,8 @@ function drawTile(ch, x, y) {
     ctx.arc(px + 16, py + 17, 3, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillRect(px + 15, py + 18, 2, 6);
-  } else if (ch === "C") {
-    ctx.fillStyle = "#8a5a2e";
-    ctx.fillRect(px + 5, py + 10, 22, 16);
-    ctx.fillStyle = "#a8743f";
-    ctx.fillRect(px + 5, py + 8, 22, 7);
-    ctx.fillStyle = "#ffd75e";
-    ctx.fillRect(px + 5, py + 14, 22, 2);
-    ctx.fillRect(px + 14, py + 13, 4, 6);
+  } else if (ch === "C" || ch === "$" || ch === "o") {
+    drawChest(px, py, ch === "o");
   } else if (ch === "h") {
     const bob = Math.sin(time * 4) * 2;
     ctx.fillStyle = "#e0e6ea";
@@ -356,7 +475,7 @@ function drawSlime(e) {
   const h = 14 * size - squish;
   drawShadow(cx, e.dy * TILE + 16, w);
   const flash = e.flash > 0 && Math.floor(time * 20) % 2;
-  ctx.fillStyle = flash ? "#fff" : e.boss ? "#d1405a" : "#4fc46b";
+  ctx.fillStyle = flash ? "#fff" : e.color;
   ctx.beginPath();
   ctx.moveTo(cx - w, base);
   ctx.quadraticCurveTo(cx - w, base - h * 1.4, cx, base - h * 1.4);
@@ -385,16 +504,94 @@ function drawSlime(e) {
   }
 }
 
-function drawBanner(text) {
-  ctx.fillStyle = "#000000a0";
-  ctx.fillRect(0, canvas.height / 2 - 34, canvas.width, 68);
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 28px Trebuchet MS, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText(text, canvas.width / 2, canvas.height / 2 + 4);
-  ctx.font = "14px Trebuchet MS, sans-serif";
-  ctx.fillText("Press R or Restart to play again", canvas.width / 2, canvas.height / 2 + 24);
+// ---------- HUD (drawn in screen units, SCREEN_W × SCREEN_H) ----------
+
+const FONT = "Trebuchet MS, sans-serif";
+
+function panel(x, y, w, h) {
+  ctx.fillStyle = "#0f1a14c0";
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 5);
+  ctx.fill();
 }
+
+function bar(x, y, w, h, fraction, color) {
+  ctx.fillStyle = "#00000080";
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, w * Math.max(0, fraction), h);
+}
+
+function wrapText(text, maxWidth) {
+  const lines = [""];
+  for (const word of text.split(" ")) {
+    const test = lines[lines.length - 1] ? `${lines[lines.length - 1]} ${word}` : word;
+    if (ctx.measureText(test).width > maxWidth && lines[lines.length - 1]) lines.push(word);
+    else lines[lines.length - 1] = test;
+  }
+  return lines;
+}
+
+function drawHud() {
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+
+  panel(8, 8, 136, 46);
+  ctx.fillStyle = "#fff";
+  ctx.font = `bold 11px ${FONT}`;
+  ctx.fillText(`Lv ${player.level}`, 15, 21);
+  ctx.font = `10px ${FONT}`;
+  ctx.fillStyle = "#ffd75e";
+  ctx.fillText(`${player.gold}g${player.key ? "  🔑" : ""}`, 50, 21);
+  bar(15, 27, 122, 8, player.hp / player.maxHp, "#e0485b");
+  bar(15, 40, 122, 4, player.xp / (player.level * 4), "#7fb6ea");
+  ctx.fillStyle = "#fff";
+  ctx.font = `bold 7px ${FONT}`;
+  ctx.fillText(`${player.hp}/${player.maxHp}`, 17, 34);
+
+  if (message && time - message.time < 6) {
+    ctx.globalAlpha = Math.min(1, 6 - (time - message.time));
+    ctx.font = `11px ${FONT}`;
+    const lines = wrapText(message.text, 240);
+    const h = 10 + lines.length * 14;
+    panel(SCREEN_W / 2 - 130, SCREEN_H - 8 - h, 260, h);
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    lines.forEach((line, i) => ctx.fillText(line, SCREEN_W / 2, SCREEN_H - 8 - h + 18 + i * 14));
+    ctx.globalAlpha = 1;
+  }
+
+  drawMinimap();
+
+  if (gameState !== "play") {
+    ctx.fillStyle = "#000000a0";
+    ctx.fillRect(0, SCREEN_H / 2 - 34, SCREEN_W, 68);
+    ctx.fillStyle = "#fff";
+    ctx.textAlign = "center";
+    ctx.font = `bold 28px ${FONT}`;
+    ctx.fillText(gameState === "won" ? "Victory!" : "Game over", SCREEN_W / 2, SCREEN_H / 2 + 4);
+    ctx.font = `12px ${FONT}`;
+    ctx.fillText("Press R or ↻ to play again", SCREEN_W / 2, SCREEN_H / 2 + 24);
+  }
+}
+
+function drawMinimap() {
+  const s = 1.5;
+  const mx = SCREEN_W - 8 - WORLD_W * s;
+  const my = SCREEN_H - 8 - WORLD_H * s;
+  panel(mx - 3, my - 3, WORLD_W * s + 6, WORLD_H * s + 6);
+  for (let y = 0; y < WORLD_H; y++) {
+    for (let x = 0; x < WORLD_W; x++) {
+      if (!seen[y][x]) continue;
+      ctx.fillStyle = MINIMAP_COLORS[tiles[y][x]] || "#6aa85a";
+      ctx.fillRect(mx + x * s, my + y * s, s, s);
+    }
+  }
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(mx + player.x * s - 0.5, my + player.y * s - 0.5, s + 1, s + 1);
+}
+
+// ---------- Main loop ----------
 
 let last = performance.now();
 function frame(now) {
@@ -409,13 +606,30 @@ function frame(now) {
     a.flash = Math.max(0, a.flash - dt * 2.5);
   }
 
-  tiles.forEach((row, y) => row.forEach((ch, x) => drawTile(ch, x, y)));
-  drawSage(npc);
-  enemies.forEach(drawSlime);
+  // Camera follows the player, clamped to the world edges and snapped to
+  // whole device pixels so tile edges never blur or seam.
+  const camX = Math.min(Math.max(player.dx + 0.5 - VIEW_W / 2, 0), WORLD_W - VIEW_W);
+  const camY = Math.min(Math.max(player.dy + 0.5 - VIEW_H / 2, 0), WORLD_H - VIEW_H);
+  const scale = unit / TILE;
+  ctx.setTransform(scale, 0, 0, scale, -Math.round(camX * unit), -Math.round(camY * unit));
+
+  const x0 = Math.floor(camX);
+  const y0 = Math.floor(camY);
+  const x1 = Math.min(WORLD_W - 1, Math.ceil(camX + VIEW_W));
+  const y1 = Math.min(WORLD_H - 1, Math.ceil(camY + VIEW_H));
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      drawTile(tiles[y][x], x, y);
+      seen[y][x] = true;
+    }
+  }
+  const visible = (a) => a.dx > x0 - 2 && a.dx < x1 + 2 && a.dy > y0 - 2 && a.dy < y1 + 2;
+  if (visible(npc)) drawSage(npc);
+  enemies.filter(visible).forEach(drawSlime);
   drawHero(player);
 
   ctx.textAlign = "center";
-  ctx.font = "bold 13px Trebuchet MS, sans-serif";
+  ctx.font = `bold 13px ${FONT}`;
   for (const fx of effects) {
     fx.life -= dt;
     ctx.globalAlpha = Math.max(fx.life, 0);
@@ -427,10 +641,12 @@ function frame(now) {
   ctx.globalAlpha = 1;
   effects = effects.filter((fx) => fx.life > 0);
 
-  if (gameState === "won") drawBanner("Victory!");
-  if (gameState === "lost") drawBanner("Game over");
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  drawHud();
   requestAnimationFrame(frame);
 }
+
+// ---------- Input ----------
 
 const KEYS = {
   ArrowUp: [0, -1], KeyW: [0, -1],
@@ -441,26 +657,51 @@ const KEYS = {
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 
 window.addEventListener("keydown", (event) => {
-  if (event.code === "KeyR") {
-    reset();
-    updateHud();
-    return;
-  }
+  if (event.code === "KeyR") return reset();
   const dir = KEYS[event.code];
   if (!dir) return;
   event.preventDefault();
   move(...dir);
 });
 
+// Touch pad: press and hold to keep walking.
 document.querySelectorAll(".pad button").forEach((btn) => {
-  btn.addEventListener("click", () => move(...DIRS[btn.dataset.dir]));
+  let timer;
+  const stop = () => clearInterval(timer);
+  btn.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    btn.setPointerCapture(event.pointerId);
+    move(...DIRS[btn.dataset.dir]);
+    stop();
+    timer = setInterval(() => move(...DIRS[btn.dataset.dir]), 160);
+  });
+  btn.addEventListener("pointerup", stop);
+  btn.addEventListener("pointercancel", stop);
+  btn.addEventListener("lostpointercapture", stop);
 });
 
-document.querySelector("#restart").addEventListener("click", () => {
+document.querySelector("#restart").addEventListener("click", (event) => {
   reset();
-  updateHud();
+  event.currentTarget.blur();
 });
 
+// Fullscreen removes browser chrome so the 16:9 area can grow; on phones
+// we also try to lock landscape (unsupported browsers just ignore it).
+const fullscreenBtn = document.querySelector("#fullscreen");
+fullscreenBtn.hidden = !document.fullscreenEnabled;
+fullscreenBtn.addEventListener("click", () => {
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  } else {
+    document.documentElement.requestFullscreen()
+      .then(() => screen.orientation?.lock?.("landscape"))
+      .catch(() => {});
+  }
+  fullscreenBtn.blur();
+});
+
+window.addEventListener("resize", resize);
+resize();
 reset();
-updateHud();
+canvas.focus();
 requestAnimationFrame(frame);

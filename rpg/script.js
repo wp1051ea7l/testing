@@ -55,9 +55,9 @@ const WORLD_W = MAP[0].length;
 const WORLD_H = MAP.length;
 const SOLID = new Set(["#", "~", "W", "D", "C", "$", "o", "r", "H"]);
 const ENEMIES = {
-  g: { name: "slime", hp: 3, atk: 1, xp: 2, gold: 3, speed: 2.2, color: "#4fc46b" },
-  b: { name: "blue slime", hp: 6, atk: 2, xp: 4, gold: 6, speed: 2.6, color: "#4a8be0" },
-  B: { name: "slime king", hp: 16, atk: 3, xp: 10, gold: 50, speed: 2, color: "#d1405a", boss: true },
+  g: { name: "slime", hp: 3, atk: 1, xp: 2, gold: 3, color: "#4fc46b" },
+  b: { name: "blue slime", hp: 6, atk: 2, xp: 4, gold: 6, color: "#4a8be0" },
+  B: { name: "slime king", hp: 16, atk: 3, xp: 10, gold: 50, color: "#d1405a", boss: true },
 };
 // People you talk to by walking into them. talk(n) gets how many times
 // you've already talked to them, so lines can change.
@@ -103,6 +103,7 @@ const MINIMAP_COLORS = {
 
 let tiles, seen, player, enemies, npcs, effects, gameState, message, time = 0;
 let unit = TILE;
+let lastMove = 0;
 
 function reset() {
   tiles = MAP.map((row) => row.split(""));
@@ -113,14 +114,9 @@ function reset() {
   gameState = "play";
   tiles.forEach((row, y) => row.forEach((ch, x) => {
     const actor = { x, y, dx: x, dy: y, flash: 0 };
-    if (ch === "P") {
-      player = {
-        ...actor, hp: 10, maxHp: 10, atk: 1, xp: 0, level: 1, gold: 0, key: false,
-        facing: 1, walk: 0, moving: false, pushing: null, nextAttack: 0,
-      };
-    }
+    if (ch === "P") player = { ...actor, hp: 10, maxHp: 10, atk: 1, xp: 0, level: 1, gold: 0, key: false, facing: 1 };
     if (NPCS[ch]) npcs.push({ ...actor, ...NPCS[ch], talks: 0 });
-    if (ENEMIES[ch]) enemies.push({ ...actor, ...ENEMIES[ch], dir: null, wander: Math.random() * 2, cooldown: 0 });
+    if (ENEMIES[ch]) enemies.push({ ...actor, ...ENEMIES[ch] });
     if (ch === "P" || NPCS[ch] || ENEMIES[ch]) row[x] = ".";
   }));
   say("Find the sage in the village. Arrow keys or WASD to move.");
@@ -143,152 +139,59 @@ function say(text) {
   message = { text, time };
 }
 
+function actorAt(x, y) {
+  return enemies.find((e) => e.x === x && e.y === y) || npcs.find((n) => n.x === x && n.y === y) || null;
+}
+
 function popup(x, y, text, color) {
   effects.push({ x: x * TILE + TILE / 2, y: y * TILE, text, color, life: 1 });
 }
 
-// ---------- Movement ----------
-// Positions are in tiles and can be fractional; x = 5 means centred on
-// column 5, as on the old grid. Characters collide using a small box around
-// their feet, so you can walk close to trees and through 1-tile gaps.
+function move(mx, my) {
+  if (gameState !== "play" || time - lastMove < 0.09) return;
+  if (mx) player.facing = mx;
+  const nx = player.x + mx;
+  const ny = player.y + my;
+  const target = actorAt(nx, ny);
+  const tile = tiles[ny][nx];
 
-const PLAYER_SPEED = 4.5; // tiles per second
-const FEET = { w: 0.28, top: 0.5, bottom: 0.94 }; // half-width, top, bottom
-const ATTACK_COOLDOWN = 0.45;
-
-function box(a, x = a.x, y = a.y) {
-  const w = a.boss ? 0.36 : FEET.w;
-  return { x0: x + 0.5 - w, x1: x + 0.5 + w, y0: y + FEET.top, y1: y + FEET.bottom };
-}
-
-function overlaps(a, b, margin = 0) {
-  return a.x0 - margin < b.x1 && a.x1 + margin > b.x0 && a.y0 - margin < b.y1 && a.y1 + margin > b.y0;
-}
-
-// Slimes can't cross bridges; everyone else follows SOLID.
-function solidFor(a, ch) {
-  return SOLID.has(ch) || (a !== player && ch === "=");
-}
-
-// What `a` would run into at (x, y): { actor } or { tile, tx, ty } or null.
-function blockerAt(a, x, y) {
-  const b = box(a, x, y);
-  for (const o of [player, ...npcs, ...enemies]) {
-    if (o !== a && overlaps(b, box(o))) return { actor: o };
-  }
-  for (let ty = Math.floor(b.y0); ty <= Math.floor(b.y1 - 1e-6); ty++) {
-    for (let tx = Math.floor(b.x0); tx <= Math.floor(b.x1 - 1e-6); tx++) {
-      if (solidFor(a, tiles[ty][tx])) return { tile: tiles[ty][tx], tx, ty };
-    }
-  }
-  return null;
-}
-
-// Moves `a` by (dx, dy), stopping flush against whatever is in the way.
-// Returns what it hit, or null.
-function slide(a, dx, dy) {
-  const hit = blockerAt(a, a.x + dx, a.y + dy);
-  if (!hit) {
-    a.x += dx;
-    a.y += dy;
-    return null;
-  }
-  let lo = 0;
-  let hi = 1;
-  for (let i = 0; i < 6; i++) {
-    const mid = (lo + hi) / 2;
-    if (blockerAt(a, a.x + dx * mid, a.y + dy * mid)) hi = mid;
-    else lo = mid;
-  }
-  a.x += dx * lo;
-  a.y += dy * lo;
-  return hit;
-}
-
-// Clipping a corner: if shifting sideways a little would clear the way,
-// slide sideways instead of stopping dead.
-function nudge(a, dx, dy, step) {
-  for (let off = 0.08; off <= 0.4; off += 0.08) {
-    for (const s of [1, -1]) {
-      const ox = dy ? s * off : 0;
-      const oy = dx ? s * off : 0;
-      if (!blockerAt(a, a.x + ox, a.y + oy) && !blockerAt(a, a.x + ox + dx, a.y + oy + dy)) {
-        slide(a, Math.sign(ox) * step, Math.sign(oy) * step);
-        return;
-      }
-    }
-  }
-}
-
-function updatePlayer(dt) {
-  let [mx, my] = heldDirection();
-  player.moving = false;
-  if (!mx && !my) {
-    player.pushing = null;
-    return;
-  }
-  const len = Math.hypot(mx, my);
-  mx /= len;
-  my /= len;
-  if (mx) player.facing = Math.sign(mx);
-  const step = PLAYER_SPEED * dt;
-  const { x, y } = player;
-  const hitX = mx ? slide(player, mx * step, 0) : null;
-  const hitY = my ? slide(player, 0, my * step) : null;
-  if (hitX?.tile && !my) nudge(player, mx * step, 0, step);
-  if (hitY?.tile && !mx) nudge(player, 0, my * step, step);
-  const moved = Math.hypot(player.x - x, player.y - y);
-  player.moving = moved > step * 0.2;
-  player.walk += moved;
-  bump(hitX || hitY);
-
-  const tx = Math.floor(player.x + 0.5);
-  const ty = Math.floor(player.y + 0.75);
-  if (tiles[ty][tx] === "h") {
-    tiles[ty][tx] = ".";
-    player.hp = player.maxHp;
-    popup(tx, ty, "healed", "#7be08f");
-    say("You drink a potion. Fully healed!");
-  }
-}
-
-// Walking into something interacts with it. Talking, chests and doors
-// happen once per bump; pushing into a slime keeps attacking.
-function bump(hit) {
-  const target = hit && (hit.actor || `${hit.tx},${hit.ty}`);
-  const fresh = target !== player.pushing;
-  player.pushing = target;
-  if (!hit) return;
-  const { actor, tile, tx, ty } = hit;
-  if (actor?.talk) {
-    if (fresh) say(`${actor.name}: ${actor.talk(actor.talks++)}`);
-  } else if (actor) {
-    if (time >= player.nextAttack) {
-      attack(actor);
-      player.nextAttack = time + ATTACK_COOLDOWN;
-    }
-  } else if (!fresh) {
-    return;
+  if (target?.talk) {
+    say(`${target.name}: ${target.talk(target.talks++)}`);
+  } else if (target) {
+    attack(target);
   } else if (tile === "C" || tile === "$") {
-    tiles[ty][tx] = "o";
+    tiles[ny][nx] = "o";
     const gold = tile === "C" ? 10 : 25;
     player.gold += gold;
     if (tile === "C") {
       player.key = true;
-      popup(tx, ty, "+key", "#ffd75e");
+      popup(nx, ny, "+key", "#ffd75e");
       say(`You found the castle key and ${gold} gold!`);
     } else {
-      popup(tx, ty, `+${gold}`, "#ffd75e");
+      popup(nx, ny, `+${gold}`, "#ffd75e");
       say(`You found ${gold} gold!`);
     }
   } else if (tile === "D") {
     if (player.key) {
-      tiles[ty][tx] = ":";
+      tiles[ny][nx] = ":";
       say("The castle door creaks open...");
     } else {
       say("The castle door is locked.");
     }
+  } else if (!SOLID.has(tile)) {
+    player.x = nx;
+    player.y = ny;
+    if (tile === "h") {
+      tiles[ny][nx] = ".";
+      player.hp = player.maxHp;
+      popup(nx, ny, "healed", "#7be08f");
+      say("You drink a potion. Fully healed!");
+    }
+  } else {
+    return;
   }
+  lastMove = time;
+  enemyTurn();
 }
 
 function attack(enemy) {
@@ -296,10 +199,6 @@ function attack(enemy) {
   enemy.hp -= dmg;
   enemy.flash = 1;
   popup(enemy.x, enemy.y, `-${dmg}`, "#fff");
-  // Knock it back a little so each hit lands with a bump.
-  const dist = Math.hypot(enemy.x - player.x, enemy.y - player.y) || 1;
-  slide(enemy, (enemy.x - player.x) / dist * 0.35, 0);
-  slide(enemy, 0, (enemy.y - player.y) / dist * 0.35);
   if (enemy.hp > 0) return say(`You hit the ${enemy.name}.`);
 
   enemies = enemies.filter((e) => e !== enemy);
@@ -321,35 +220,31 @@ function attack(enemy) {
   }
 }
 
-// Slimes chase you when close and wander otherwise. They're slower than you,
-// and each one can hit at most about once a second while touching you.
-function updateEnemies(dt) {
+function enemyTurn() {
   for (const e of enemies) {
-    e.cooldown = Math.max(0, e.cooldown - dt);
-    const px = player.x - e.x;
-    const py = player.y - e.y;
-    const dist = Math.hypot(px, py);
-    let speed = 0.9;
-    if (dist < 4.5) {
-      e.dir = [px / dist, py / dist];
-      speed = e.speed;
-    } else if ((e.wander -= dt) <= 0) {
-      const angle = Math.random() * Math.PI * 2;
-      e.dir = Math.random() < 0.4 ? null : [Math.cos(angle), Math.sin(angle)];
-      e.wander = 1 + Math.random() * 1.5;
-    }
-    if (e.dir) {
-      const hitX = slide(e, e.dir[0] * speed * dt, 0);
-      const hitY = slide(e, 0, e.dir[1] * speed * dt);
-      if ((hitX?.tile || hitY?.tile) && dist >= 4.5) e.wander = 0;
-    }
-    if (e.cooldown <= 0 && overlaps(box(e), box(player), 0.1)) {
-      e.cooldown = 1.1;
+    const distX = player.x - e.x;
+    const distY = player.y - e.y;
+    const dist = Math.abs(distX) + Math.abs(distY);
+    if (dist === 1) {
       if (Math.random() < 0.7) {
         player.hp -= e.atk;
         player.flash = 1;
         popup(player.x, player.y, `-${e.atk}`, "#ff6b6b");
       }
+      continue;
+    }
+    // Chase when close, otherwise wander now and then.
+    let step;
+    if (dist <= 4) {
+      step = Math.abs(distX) > Math.abs(distY) ? [Math.sign(distX), 0] : [0, Math.sign(distY)];
+    } else if (Math.random() < 0.4) {
+      step = [[1, 0], [-1, 0], [0, 1], [0, -1]][Math.floor(Math.random() * 4)];
+    } else continue;
+    const nx = e.x + step[0];
+    const ny = e.y + step[1];
+    if (!SOLID.has(tiles[ny][nx]) && tiles[ny][nx] !== "=" && !actorAt(nx, ny) && !(nx === player.x && ny === player.y)) {
+      e.x = nx;
+      e.y = ny;
     }
   }
   if (player.hp <= 0) {
@@ -547,17 +442,8 @@ function drawShadow(cx, cy, w) {
 
 function drawHero(p) {
   const cx = p.dx * TILE + 16;
-  // Hop with each stride while walking (about two per tile), idle sway otherwise.
-  const bob = p.moving ? -Math.abs(Math.sin(p.walk * Math.PI * 2)) * 2.5 : Math.sin(time * 6) * 1;
-  const cy = p.dy * TILE + 16 + bob;
+  const cy = p.dy * TILE + 16 + Math.sin(time * 6) * 1;
   drawShadow(cx, p.dy * TILE + 16, 9);
-  ctx.save();
-  if (p.moving) {
-    const feet = p.dy * TILE + 28;
-    ctx.translate(cx, feet);
-    ctx.rotate(p.facing * 0.07);
-    ctx.translate(-cx, -feet);
-  }
   const flash = p.flash > 0 && Math.floor(time * 20) % 2;
   // sword
   ctx.fillStyle = "#d9dde3";
@@ -581,7 +467,6 @@ function drawHero(p) {
   ctx.fillStyle = "#222";
   ctx.fillRect(cx - 3 + p.facing, cy - 7, 2, 2);
   ctx.fillRect(cx + 1 + p.facing, cy - 7, 2, 2);
-  ctx.restore();
 }
 
 function drawSage(n) {
@@ -760,13 +645,12 @@ function frame(now) {
   const dt = Math.min((now - last) / 1000, 0.1);
   last = now;
   time = now / 1000;
-  if (gameState === "play") {
-    updatePlayer(dt);
-    updateEnemies(dt);
-  }
+  if (heldKeys.length && time - lastMove >= STEP_TIME) move(...KEYS[heldKeys.at(-1)]);
+
+  // Ease drawn positions toward grid positions for smooth steps.
   for (const a of [player, ...npcs, ...enemies]) {
-    a.dx = a.x;
-    a.dy = a.y;
+    a.dx += (a.x - a.dx) * Math.min(dt * 18, 1);
+    a.dy += (a.y - a.dy) * Math.min(dt * 18, 1);
     a.flash = Math.max(0, a.flash - dt * 2.5);
   }
 
@@ -788,10 +672,9 @@ function frame(now) {
     }
   }
   const visible = (a) => a.dx > x0 - 2 && a.dx < x1 + 2 && a.dy > y0 - 2 && a.dy < y1 + 2;
-  // Draw back to front so characters lower on screen overlap those above.
-  const actors = [...npcs, ...enemies].filter(visible).map((a) => [a, a.draw || drawSlime]);
-  actors.push([player, drawHero]);
-  actors.sort((a, b) => a[0].dy - b[0].dy).forEach(([a, draw]) => draw(a));
+  npcs.filter(visible).forEach((n) => n.draw(n));
+  enemies.filter(visible).forEach(drawSlime);
+  drawHero(player);
 
   ctx.textAlign = "center";
   ctx.font = `bold 13px ${FONT}`;
@@ -821,43 +704,38 @@ const KEYS = {
 };
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 
-// Movement comes from what's held right now (keys and touch pad), read every
-// frame, so walking starts instantly and diagonals work.
-const heldKeys = new Set();
-const heldPad = new Set();
-
-function heldDirection() {
-  let x = 0;
-  let y = 0;
-  for (const [dx, dy] of [...[...heldKeys].map((k) => KEYS[k]), ...[...heldPad].map((d) => DIRS[d])]) {
-    x += dx;
-    y += dy;
-  }
-  return [Math.sign(x), Math.sign(y)];
-}
+// Held movement keys, most recent last. frame() keeps stepping while one is
+// down, so walking starts right away instead of waiting for key repeat.
+const heldKeys = [];
+const STEP_TIME = 0.16;
 
 window.addEventListener("keydown", (event) => {
   if (event.code === "KeyR") return reset();
   const dir = KEYS[event.code];
   if (!dir) return;
   event.preventDefault();
-  heldKeys.add(event.code);
+  if (event.repeat) return;
+  if (!heldKeys.includes(event.code)) heldKeys.push(event.code);
+  move(...dir);
 });
 
-window.addEventListener("keyup", (event) => heldKeys.delete(event.code));
-
-window.addEventListener("blur", () => {
-  heldKeys.clear();
-  heldPad.clear();
+window.addEventListener("keyup", (event) => {
+  const i = heldKeys.indexOf(event.code);
+  if (i >= 0) heldKeys.splice(i, 1);
 });
+
+window.addEventListener("blur", () => { heldKeys.length = 0; });
 
 // Touch pad: press and hold to keep walking.
 document.querySelectorAll(".pad button").forEach((btn) => {
-  const stop = () => heldPad.delete(btn.dataset.dir);
+  let timer;
+  const stop = () => clearInterval(timer);
   btn.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     btn.setPointerCapture(event.pointerId);
-    heldPad.add(btn.dataset.dir);
+    move(...DIRS[btn.dataset.dir]);
+    stop();
+    timer = setInterval(() => move(...DIRS[btn.dataset.dir]), 160);
   });
   btn.addEventListener("pointerup", stop);
   btn.addEventListener("pointercancel", stop);

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <title>3D JRPG · Testing</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    } }
+  </script>
+  <script type="module" src="script.js"></script>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game" tabindex="0" aria-label="3D role-playing game"></canvas>
+
+    <div id="zone" class="window" hidden></div>
+    <div id="hint" class="window"></div>
+    <div id="dialog" class="window" hidden>
+      <strong></strong>
+      <p></p>
+      <span class="more">▼</span>
+    </div>
+
+    <div id="battle" hidden>
+      <div id="enemies" class="window"></div>
+      <div id="party" class="window"></div>
+      <div id="command" class="window" hidden></div>
+      <div id="announce" class="window" hidden></div>
+      <div id="result" class="window" hidden></div>
+    </div>
+
+    <div id="numbers" aria-hidden="true"></div>
+
+    <div id="stick" aria-hidden="true"><div></div></div>
+    <button id="action" type="button" aria-label="Talk or confirm">A</button>
+
+    <div class="buttons">
+      <button id="fullscreen" type="button" aria-label="Toggle fullscreen" hidden>⛶</button>
+      <a href="../" aria-label="Back to all tests">✕</a>
+    </div>
+
+    <div id="transition"></div>
+    <div id="loading">Loading…</div>
+  </div>
+  <div class="rotate" role="alert">
+    <span>⟳</span>
+    Rotate your device to landscape
+  </div>
+</body>
+</html>

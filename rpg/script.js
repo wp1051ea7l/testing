@@ -55,9 +55,9 @@ const WORLD_W = MAP[0].length;
 const WORLD_H = MAP.length;
 const SOLID = new Set(["#", "~", "W", "D", "C", "$", "o", "r", "H"]);
 const ENEMIES = {
-  g: { name: "slime", hp: 3, atk: 1, xp: 2, gold: 3, color: "#4fc46b" },
-  b: { name: "blue slime", hp: 6, atk: 2, xp: 4, gold: 6, color: "#4a8be0" },
-  B: { name: "slime king", hp: 16, atk: 3, xp: 10, gold: 50, color: "#d1405a", boss: true },
+  g: { name: "slime", hp: 3, atk: 1, xp: 2, gold: 3, sprite: "slime" },
+  b: { name: "blue slime", hp: 6, atk: 2, xp: 4, gold: 6, sprite: "slime-blue" },
+  B: { name: "slime king", hp: 16, atk: 3, xp: 10, gold: 50, sprite: "slime-king", boss: true },
 };
 // People you talk to by walking into them. talk(n) gets how many times
 // you've already talked to them, so lines can change.
@@ -78,22 +78,52 @@ const NPCS = {
   A: { name: "Astronaut", draw: drawAstronaut, talk: (n) => ASTRONAUT_LINES[n % ASTRONAUT_LINES.length] },
 };
 
-// The astronaut is an SVG. It's drawn once into a canvas at the current
-// scale (and again on resize) so it stays crisp at any screen size.
-const ASTRONAUT_H = 28; // world units tall
-const astronautSvg = new Image();
-let astronautSprite = null;
-astronautSvg.onload = prerenderAstronaut;
-astronautSvg.src = "astronaut.svg";
+// Art loaded from SVG files in sprites/ (see sprites/README.md). Tiles are
+// 32×32, one tile; characters are 32×48, with their tile as the bottom 32×32.
+// Each is pre-rendered at the current scale, plus a white copy for the hit
+// flash, so drawing stays crisp and cheap.
+const SPRITE_NAMES = ["hero", "sage", "astronaut", "slime", "slime-blue", "slime-king", "tree", "hut"];
+const sprites = {};
+for (const name of SPRITE_NAMES) {
+  const img = new Image();
+  sprites[name] = { img, art: null, flash: null };
+  img.onload = () => prerenderSprite(name);
+  img.src = `sprites/${name}.svg`;
+}
 
-function prerenderAstronaut() {
-  if (!astronautSvg.naturalWidth) return;
-  const h = Math.round(ASTRONAUT_H * unit / TILE);
-  const sprite = document.createElement("canvas");
-  sprite.height = h;
-  sprite.width = Math.round(h * astronautSvg.naturalWidth / astronautSvg.naturalHeight);
-  sprite.getContext("2d").drawImage(astronautSvg, 0, 0, sprite.width, sprite.height);
-  astronautSprite = sprite;
+function prerenderSprite(name) {
+  const s = sprites[name];
+  if (!s.img.naturalWidth) return;
+  const scale = unit / TILE;
+  const make = () => {
+    const c = document.createElement("canvas");
+    c.width = Math.round(s.img.naturalWidth * scale);
+    c.height = Math.round(s.img.naturalHeight * scale);
+    c.getContext("2d").drawImage(s.img, 0, 0, c.width, c.height);
+    return c;
+  };
+  s.art = make();
+  s.flash = make();
+  const g = s.flash.getContext("2d");
+  g.globalCompositeOperation = "source-in";
+  g.fillStyle = "#fff";
+  g.fillRect(0, 0, s.flash.width, s.flash.height);
+}
+
+// Draws a sprite with its top-left at (x, y) in world units. Characters
+// (taller than a tile) start 16 units above their tile.
+function drawSprite(name, x, y, { flip = false, flash = false } = {}) {
+  const s = sprites[name];
+  if (!s.art) return;
+  const w = s.img.naturalWidth;
+  const h = s.img.naturalHeight;
+  const art = flash ? s.flash : s.art;
+  if (!flip) return ctx.drawImage(art, x, y, w, h);
+  ctx.save();
+  ctx.translate(x + w, y);
+  ctx.scale(-1, 1);
+  ctx.drawImage(art, 0, 0, w, h);
+  ctx.restore();
 }
 
 const MINIMAP_COLORS = {
@@ -132,7 +162,7 @@ function resize() {
   stage.style.width = `${canvas.width / dpr}px`;
   stage.style.height = `${canvas.height / dpr}px`;
   stage.style.setProperty("--u", `${unit / dpr}px`);
-  prerenderAstronaut();
+  SPRITE_NAMES.forEach(prerenderSprite);
 }
 
 function say(text) {
@@ -363,16 +393,7 @@ function drawTile(ch, x, y) {
 
   drawGrass(px, py, x, y);
   if (ch === "#") {
-    ctx.fillStyle = "#6b4426";
-    ctx.fillRect(px + 13, py + 18, 6, 12);
-    ctx.fillStyle = "#2f6b34";
-    ctx.beginPath();
-    ctx.arc(px + 16, py + 14, 12, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#3f8645";
-    ctx.beginPath();
-    ctx.arc(px + 12, py + 10, 6, 0, Math.PI * 2);
-    ctx.fill();
+    drawSprite("tree", px, py);
   } else if (ch === ",") {
     const petals = ["#f5e663", "#f28bb3", "#ffffff"];
     for (let i = 0; i < 3; i++) {
@@ -395,18 +416,7 @@ function drawTile(ch, x, y) {
     ctx.ellipse(px + 13, py + 17, 6, 4, -0.3, 0, Math.PI * 2);
     ctx.fill();
   } else if (ch === "H") {
-    ctx.fillStyle = "#c9a46a";
-    ctx.fillRect(px + 5, py + 15, 22, 15);
-    ctx.fillStyle = "#b5523b";
-    ctx.beginPath();
-    ctx.moveTo(px + 2, py + 16);
-    ctx.lineTo(px + 16, py + 3);
-    ctx.lineTo(px + 30, py + 16);
-    ctx.fill();
-    ctx.fillStyle = "#6b4426";
-    ctx.fillRect(px + 13, py + 21, 7, 9);
-    ctx.fillStyle = "#ffe08a";
-    ctx.fillRect(px + 7, py + 19, 4, 4);
+    drawSprite("hut", px, py);
   } else if (ch === "D") {
     drawWall(px, py);
     ctx.fillStyle = "#8a5a2e";
@@ -442,113 +452,38 @@ function drawShadow(cx, cy, w) {
 
 function drawHero(p) {
   const cx = p.dx * TILE + 16;
-  const cy = p.dy * TILE + 16 + Math.sin(time * 6) * 1;
+  const bob = Math.sin(time * 6) * 1;
   drawShadow(cx, p.dy * TILE + 16, 9);
   const flash = p.flash > 0 && Math.floor(time * 20) % 2;
-  // sword
-  ctx.fillStyle = "#d9dde3";
-  ctx.fillRect(cx + 9 * p.facing - 1, cy - 8, 3, 14);
-  ctx.fillStyle = "#8a5a2e";
-  ctx.fillRect(cx + 9 * p.facing - 3, cy + 4, 7, 3);
-  // body
-  ctx.fillStyle = flash ? "#fff" : "#3a6fd1";
-  ctx.beginPath();
-  ctx.roundRect(cx - 7, cy - 2, 14, 14, 4);
-  ctx.fill();
-  // head
-  ctx.fillStyle = flash ? "#fff" : "#f1c79b";
-  ctx.beginPath();
-  ctx.arc(cx, cy - 7, 7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#6b3e1f";
-  ctx.beginPath();
-  ctx.arc(cx, cy - 9, 7, Math.PI, 0);
-  ctx.fill();
-  ctx.fillStyle = "#222";
-  ctx.fillRect(cx - 3 + p.facing, cy - 7, 2, 2);
-  ctx.fillRect(cx + 1 + p.facing, cy - 7, 2, 2);
+  drawSprite("hero", p.dx * TILE, p.dy * TILE - 16 + bob, { flip: p.facing < 0, flash });
 }
 
 function drawSage(n) {
-  const cx = n.dx * TILE + 16;
-  const cy = n.dy * TILE + 16;
-  drawShadow(cx, cy, 9);
-  ctx.fillStyle = "#7a4fb8";
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - 6);
-  ctx.lineTo(cx + 10, cy + 13);
-  ctx.lineTo(cx - 10, cy + 13);
-  ctx.fill();
-  ctx.fillStyle = "#f1c79b";
-  ctx.beginPath();
-  ctx.arc(cx, cy - 6, 6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#eee";
-  ctx.beginPath();
-  ctx.moveTo(cx - 5, cy - 4);
-  ctx.lineTo(cx + 5, cy - 4);
-  ctx.lineTo(cx, cy + 6);
-  ctx.fill();
-  ctx.fillStyle = "#5a3790";
-  ctx.beginPath();
-  ctx.moveTo(cx - 9, cy - 9);
-  ctx.lineTo(cx + 9, cy - 9);
-  ctx.lineTo(cx + 2, cy - 22);
-  ctx.fill();
-  ctx.fillStyle = "#8a5a2e";
-  ctx.fillRect(cx + 11, cy - 12, 2, 25);
-  ctx.fillStyle = "#7fe0ff";
-  ctx.beginPath();
-  ctx.arc(cx + 12, cy - 13, 3 + Math.sin(time * 5), 0, Math.PI * 2);
-  ctx.fill();
+  drawShadow(n.dx * TILE + 16, n.dy * TILE + 16, 9);
+  drawSprite("sage", n.dx * TILE, n.dy * TILE - 16);
 }
 
 function drawAstronaut(n) {
-  const cx = n.dx * TILE + 16;
-  drawShadow(cx, n.dy * TILE + 16, 8);
-  if (!astronautSprite) return;
+  drawShadow(n.dx * TILE + 16, n.dy * TILE + 16, 8);
   // Bobs gently upward, like it's not used to this gravity yet.
   const float = (1 - Math.cos(time * 2)) * 1.5;
-  const w = ASTRONAUT_H * astronautSprite.width / astronautSprite.height;
-  ctx.drawImage(astronautSprite, cx - w / 2, n.dy * TILE + 29 - ASTRONAUT_H - float, w, ASTRONAUT_H);
+  drawSprite("astronaut", n.dx * TILE, n.dy * TILE - 16 - float);
 }
 
 function drawSlime(e) {
   const size = e.boss ? 1.4 : 1;
   const squish = Math.sin(time * 5 + e.x) * 1.5;
   const cx = e.dx * TILE + 16;
-  const base = e.dy * TILE + 16 + 10;
-  const w = 11 * size + squish;
-  const h = 14 * size - squish;
-  drawShadow(cx, e.dy * TILE + 16, w);
+  const base = e.dy * TILE + 26;
+  drawShadow(cx, e.dy * TILE + 16, 11 * size + squish);
+  // Squish from the bottom centre: wider as it gets shorter.
+  ctx.save();
+  ctx.translate(cx, base);
+  ctx.scale((11 * size + squish) / (11 * size), (14 * size - squish) / (14 * size));
+  ctx.translate(-cx, -base);
   const flash = e.flash > 0 && Math.floor(time * 20) % 2;
-  ctx.fillStyle = flash ? "#fff" : e.color;
-  ctx.beginPath();
-  ctx.moveTo(cx - w, base);
-  ctx.quadraticCurveTo(cx - w, base - h * 1.4, cx, base - h * 1.4);
-  ctx.quadraticCurveTo(cx + w, base - h * 1.4, cx + w, base);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = "#ffffff70";
-  ctx.beginPath();
-  ctx.arc(cx - w / 2, base - h, 2.5 * size, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#222";
-  ctx.fillRect(cx - 5 * size, base - h * 0.7, 3, 4);
-  ctx.fillRect(cx + 3 * size, base - h * 0.7, 3, 4);
-  if (e.boss) {
-    const top = base - h * 1.4;
-    ctx.fillStyle = "#ffd75e";
-    ctx.beginPath();
-    ctx.moveTo(cx - 8, top + 2);
-    ctx.lineTo(cx - 8, top - 8);
-    ctx.lineTo(cx - 4, top - 3);
-    ctx.lineTo(cx, top - 10);
-    ctx.lineTo(cx + 4, top - 3);
-    ctx.lineTo(cx + 8, top - 8);
-    ctx.lineTo(cx + 8, top + 2);
-    ctx.fill();
-  }
+  drawSprite(e.sprite, e.dx * TILE, e.dy * TILE - 16, { flash });
+  ctx.restore();
 }
 
 // ---------- HUD (drawn in screen units, SCREEN_W × SCREEN_H) ----------

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="48" viewBox="0 0 32 48">
+  <!-- Faces right; the game mirrors it to face left. Bottom 32×32 is the tile. -->
+  <g id="sword">
+    <rect x="24" y="24" width="3" height="14" fill="#d9dde3"/>
+    <rect x="22" y="36" width="7" height="3" fill="#8a5a2e"/>
+  </g>
+  <rect id="body" x="9" y="30" width="14" height="14" rx="4" fill="#3a6fd1"/>
+  <circle id="head" cx="16" cy="25" r="7" fill="#f1c79b"/>
+  <path id="hair" d="M9 23 A7 7 0 0 1 23 23 Z" fill="#6b3e1f"/>
+  <g id="eyes" fill="#222">
+    <rect x="14" y="25" width="2" height="2"/>
+    <rect x="18" y="25" width="2" height="2"/>
+  </g>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="48" viewBox="0 0 32 48">
+  <!-- Bottom 32×32 is the tile. -->
+  <path id="robe" d="M16 26 L26 45 L6 45 Z" fill="#7a4fb8"/>
+  <circle id="head" cx="16" cy="26" r="6" fill="#f1c79b"/>
+  <path id="beard" d="M11 28 L21 28 L16 38 Z" fill="#eeeeee"/>
+  <path id="hat" d="M7 23 L25 23 L18 10 Z" fill="#5a3790"/>
+  <rect id="staff" x="27" y="20" width="2" height="25" fill="#8a5a2e"/>
+  <circle id="orb" cx="28" cy="19" r="3.5" fill="#7fe0ff"/>
+</svg>

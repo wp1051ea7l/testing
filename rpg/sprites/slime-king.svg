@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="48" viewBox="0 0 32 48">
+  <!-- Bottom 32×32 is the tile. The game squishes it from the bottom centre. -->
+  <path id="body" d="M0.6 42 Q0.6 14.56 16 14.56 Q31.4 14.56 31.4 42 Z" fill="#d1405a"/>
+  <circle id="shine" cx="8.3" cy="22.4" r="3.5" fill="#ffffff" fill-opacity="0.44"/>
+  <g id="eyes" fill="#222">
+    <rect x="9" y="28.28" width="3" height="4"/>
+    <rect x="20.2" y="28.28" width="3" height="4"/>
+  </g>
+  <path id="crown" d="M8 16.56 L8 6.56 L12 11.56 L16 4.56 L20 11.56 L24 6.56 L24 16.56 Z" fill="#ffd75e"/>
+</svg>
